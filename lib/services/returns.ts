@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { PHOTO_BUCKET } from '@/lib/supabase/config'
 import { monthStartISO, todayISO } from '@/lib/format'
 
 import type {
@@ -504,6 +505,13 @@ function rangeInDays(
 export interface ReturnDetail {
   header: ReturnHeader & {
     created_by_name: string | null
+
+    /*
+     * Signed URL sementara untuk menampilkan foto
+     * dari Supabase Storage private bucket.
+     */
+    foto_surat_jalan_signed_url: string | null
+    foto_material_signed_url: string | null
   }
 
   items: ReturnItem[]
@@ -596,6 +604,52 @@ export async function getReturnDetail(
   }
 
   /* ==========================================================
+     BUAT SIGNED URL FOTO
+     ========================================================== */
+
+  const createPhotoSignedUrl = async (
+    path: string | null,
+  ): Promise<string | null> => {
+    if (!path) {
+      return null
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .createSignedUrl(
+        path,
+        60 * 60,
+      )
+
+    if (error) {
+      console.error(
+        '[getReturnDetail] Gagal membuat signed URL foto:',
+        error.message,
+      )
+
+      return null
+    }
+
+    return data.signedUrl
+  }
+
+  const [
+    fotoSuratJalanSignedUrl,
+    fotoMaterialSignedUrl,
+  ] = await Promise.all([
+    createPhotoSignedUrl(
+      header.foto_surat_jalan_url,
+    ),
+
+    createPhotoSignedUrl(
+      header.foto_material_url,
+    ),
+  ])
+
+  /* ==========================================================
      AMBIL SEMUA ITEMS DALAM HEADER
      ========================================================== */
 
@@ -612,8 +666,7 @@ export async function getReturnDetail(
     .order(
       'id',
       {
-        ascending:
-          true,
+        ascending: true,
       },
     )
 
@@ -661,16 +714,14 @@ export async function getReturnDetail(
         ...(item as ReturnItem),
 
         tebal:
-          item.tebal ===
-          null
+          item.tebal === null
             ? null
             : Number(
                 item.tebal,
               ),
 
         panjang:
-          item.panjang ===
-          null
+          item.panjang === null
             ? null
             : Number(
                 item.panjang,
@@ -678,20 +729,17 @@ export async function getReturnDetail(
 
         qty_surat_jalan:
           Number(
-            item.qty_surat_jalan ??
-              0,
+            item.qty_surat_jalan ?? 0,
           ),
 
         qty_aktual:
           Number(
-            item.qty_aktual ??
-              0,
+            item.qty_aktual ?? 0,
           ),
 
         progres:
           Number(
-            item.progres ??
-              0,
+            item.progres ?? 0,
           ),
       }),
     )
@@ -704,11 +752,15 @@ export async function getReturnDetail(
     header: {
       ...(header as ReturnHeader),
 
-      created_by_name:
-        null,
+      created_by_name: null,
+
+      foto_surat_jalan_signed_url:
+        fotoSuratJalanSignedUrl,
+
+      foto_material_signed_url:
+        fotoMaterialSignedUrl,
     },
 
-    items:
-      normalizedItems,
+    items: normalizedItems,
   }
 }
