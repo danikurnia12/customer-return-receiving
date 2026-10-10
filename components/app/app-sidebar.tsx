@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  BrainCircuit,
   ClipboardCheck,
   History,
   LayoutDashboard,
@@ -31,10 +32,21 @@ import {
 } from '@/components/ui/sidebar'
 
 /* ============================================================
+   NAVIGATION TYPE
+   ============================================================ */
+
+type NavItem = {
+  href: string
+  label: string
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+/* ============================================================
    MAIN NAVIGATION
    ============================================================ */
 
-const MAIN_NAV = [
+const MAIN_NAV: NavItem[] = [
   {
     href: '/dashboard',
     label: 'Dashboard Return',
@@ -59,13 +71,19 @@ const MAIN_NAV = [
     description: 'Riwayat aktivitas return',
     icon: History,
   },
+  {
+    href: '/ai',
+    label: 'AI Insight',
+    description: 'Analisis data Return dengan AI',
+    icon: BrainCircuit,
+  },
 ]
 
 /* ============================================================
    SETTINGS NAVIGATION
    ============================================================ */
 
-const SETTINGS_NAV = [
+const SETTINGS_NAV: NavItem[] = [
   {
     href: '/settings/users',
     label: 'Users',
@@ -91,11 +109,7 @@ export function AppSidebar() {
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`)
 
-  const renderItems = (
-    items:
-      | typeof MAIN_NAV
-      | typeof SETTINGS_NAV,
-  ) =>
+  const renderItems = (items: NavItem[]) =>
     items.map((item) => {
       const active = isActive(item.href)
 
