@@ -9,6 +9,8 @@ import {
 
 import { listInspectionQueue } from '@/lib/services/inspection'
 
+export const dynamic = 'force-dynamic'
+
 function formatDate(value: string | null) {
   if (!value) return '-'
 

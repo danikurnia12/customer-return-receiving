@@ -1,3 +1,4 @@
+
 'use server'
 
 import { revalidatePath } from 'next/cache'
@@ -11,6 +12,13 @@ type ActionResult = {
   ok: boolean
   error?: string
 }
+
+const ALLOWED_STATUSES = [
+  'Open',
+  'Proses',
+  'Hold',
+  'Selesai',
+] as const
 
 function clean(value: FormDataEntryValue | null) {
   if (typeof value !== 'string') {
@@ -116,63 +124,90 @@ export async function updateInspectionItemAction(
     }
   }
 
-  const user = await getCurrentUser()
-
-  if (!user) {
-    return {
-      ok: false,
-      error: 'Sesi berakhir. Silakan login kembali.',
-    }
-  }
-
-  if (!canEditReturn(user.role)) {
-    return {
-      ok: false,
-      error: 'Anda tidak memiliki akses untuk mengubah data inspeksi.',
-    }
-  }
-
-  const numericId = Number(itemId)
-
-  if (!Number.isInteger(numericId) || numericId <= 0) {
-    return {
-      ok: false,
-      error: 'ID item inspeksi tidak valid.',
-    }
-  }
-
-  const status = clean(formData.get('status')) ?? 'Open'
-
-  const progresRaw = clean(formData.get('progres'))
-  const progres = progresRaw === null ? 0 : Number(progresRaw)
-
-  if (!Number.isFinite(progres)) {
-    return {
-      ok: false,
-      error: 'Progres harus berupa angka.',
-    }
-  }
-
-  if (progres < 0 || progres > 100) {
-    return {
-      ok: false,
-      error: 'Progres harus berada di antara 0 sampai 100%.',
-    }
-  }
-
-  const nextData = {
-    status,
-    progres,
-    no_ncr: clean(formData.get('no_ncr')),
-    disposisi: clean(formData.get('disposisi')),
-    pic: clean(formData.get('pic')),
-    tindakan: clean(formData.get('tindakan')),
-    target: clean(formData.get('target')),
-  }
-
   try {
+    // 1. Verifikasi pengguna
+    const user = await getCurrentUser()
+
+    if (!user) {
+      return {
+        ok: false,
+        error: 'Sesi berakhir. Silakan login kembali.',
+      }
+    }
+
+    // 2. Tolak akun yang belum aktif
+    if (user.status !== 'active') {
+      return {
+        ok: false,
+        error: 'Akun Anda belum aktif. Hubungi administrator.',
+      }
+    }
+
+    // 3. Periksa izin role
+    if (!canEditReturn(user.role)) {
+      return {
+        ok: false,
+        error:
+          'Anda tidak memiliki akses untuk mengubah data inspeksi.',
+      }
+    }
+
+    // 4. Validasi ID
+    const numericId = Number(itemId)
+
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      return {
+        ok: false,
+        error: 'ID item inspeksi tidak valid.',
+      }
+    }
+
+    // 5. Validasi status
+    const rawStatus = clean(formData.get('status'))
+    const status = rawStatus ?? 'Open'
+
+    if (
+      !ALLOWED_STATUSES.some(
+        (allowedStatus) => allowedStatus === status,
+      )
+    ) {
+      return {
+        ok: false,
+        error: 'Status inspeksi tidak valid.',
+      }
+    }
+
+    // 6. Validasi progres
+    const progresRaw = clean(formData.get('progres'))
+    const progres = progresRaw === null ? 0 : Number(progresRaw)
+
+    if (
+      !Number.isInteger(progres) ||
+      progres < 0 ||
+      progres > 100 ||
+      progres % 5 !== 0
+    ) {
+      return {
+        ok: false,
+        error:
+          'Progres harus berupa angka kelipatan 5 antara 0 sampai 100%.',
+      }
+    }
+
+    // 7. Siapkan data yang diperbolehkan untuk diperbarui
+    const nextData = {
+      status,
+      progres,
+      no_ncr: clean(formData.get('no_ncr')),
+      disposisi: clean(formData.get('disposisi')),
+      pic: clean(formData.get('pic')),
+      tindakan: clean(formData.get('tindakan')),
+      target: clean(formData.get('target')),
+    }
+
     const supabase = await createClient()
 
+    // 8. Ambil data lama
     const oldResult = await supabase
       .from('return_items')
       .select(
@@ -181,20 +216,19 @@ export async function updateInspectionItemAction(
       .eq('id', numericId)
       .maybeSingle()
 
-    const oldData = oldResult.data
-    const oldError = oldResult.error
-
-    if (oldError) {
+    if (oldResult.error) {
       console.error(
         '[updateInspectionItemAction] old data:',
-        oldError.message,
+        oldResult.error.message,
       )
 
       return {
         ok: false,
-        error: friendlyDbError(oldError.message),
+        error: friendlyDbError(oldResult.error.message),
       }
     }
+
+    const oldData = oldResult.data
 
     if (!oldData) {
       return {
@@ -203,26 +237,26 @@ export async function updateInspectionItemAction(
       }
     }
 
+    // 9. Pastikan Return induk tersedia dan tidak dibatalkan
     const parentResult = await supabase
       .from('return_headers')
       .select('id, status')
       .eq('id', oldData.return_header_id)
       .maybeSingle()
 
-    const parent = parentResult.data
-    const parentError = parentResult.error
-
-    if (parentError) {
+    if (parentResult.error) {
       console.error(
         '[updateInspectionItemAction] parent:',
-        parentError.message,
+        parentResult.error.message,
       )
 
       return {
         ok: false,
-        error: friendlyDbError(parentError.message),
+        error: friendlyDbError(parentResult.error.message),
       }
     }
+
+    const parent = parentResult.data
 
     if (!parent) {
       return {
@@ -239,6 +273,7 @@ export async function updateInspectionItemAction(
       }
     }
 
+    // 10. Periksa perubahan
     const changedFields = getChangedFields(
       oldData,
       nextData,
@@ -250,10 +285,12 @@ export async function updateInspectionItemAction(
       }
     }
 
+    // 11. Simpan pembaruan inspeksi
     const updateResult = await supabase
       .from('return_items')
       .update(nextData)
       .eq('id', numericId)
+      .select('id')
 
     if (updateResult.error) {
       console.error(
@@ -267,6 +304,15 @@ export async function updateInspectionItemAction(
       }
     }
 
+    if (!updateResult.data?.length) {
+      return {
+        ok: false,
+        error:
+          'Data tidak diperbarui. Periksa kembali izin akses dan data inspeksi.',
+      }
+    }
+
+    // 12. Catat riwayat perubahan
     const historyResult = await supabase
       .from('return_history')
       .insert({
@@ -289,15 +335,24 @@ export async function updateInspectionItemAction(
       })
 
     if (historyResult.error) {
+      // Data sudah berubah, tetapi riwayat gagal disimpan.
+      // Catat kegagalan agar dapat diperiksa administrator.
       console.error(
         '[updateInspectionItemAction] history:',
         historyResult.error.message,
       )
+
+      return {
+        ok: false,
+        error:
+          'Data inspeksi sudah diperbarui, tetapi riwayat perubahan gagal disimpan. Hubungi administrator sebelum mengulangi proses.',
+      }
     }
 
+    // 13. Perbarui cache halaman terkait
     revalidatePath('/inspection')
-    revalidatePath('/inspection/' + numericId)
-    revalidatePath('/returns/' + oldData.return_header_id)
+    revalidatePath(`/inspection/${numericId}`)
+    revalidatePath(`/returns/${oldData.return_header_id}`)
     revalidatePath('/returns')
     revalidatePath('/dashboard')
     revalidatePath('/history')
