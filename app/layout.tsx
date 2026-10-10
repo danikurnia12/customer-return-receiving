@@ -8,23 +8,27 @@ import './globals.css'
 const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
+
 export const metadata: Metadata = {
   title: {
-    default: 'Customer Return Receiving',
-    template: '%s | Customer Return Receiving',
+    default: 'Customer Return',
+    template: '%s | Customer Return',
   },
   description:
     'Aplikasi pencatatan penerimaan material retur dari customer karena material abnormal.',
-  generator: '/spindo 5.png',
-  icons: {
-    icon: [
-      { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
-      { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
-    ],
-    apple: '/spindo 5.png',
-  },
+  applicationName: 'Customer Return',
+  manifest: '/manifest.webmanifest',
+
+icons: {
+  icon: [
+    { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    { url: '/spindo 5.png' },
+  ],
+  apple: '/spindo 5.png',
+},
 }
+
 
 export const viewport: Viewport = {
   colorScheme: 'light dark',
