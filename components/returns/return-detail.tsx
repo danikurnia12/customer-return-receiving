@@ -12,6 +12,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Trash2,
   UserRound,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,6 +20,7 @@ import { toast } from 'sonner'
 import {
   addReturnItemAction,
   cancelReturnAction,
+  deleteCancelledReturnAction,
   deleteReturnItemAction,
   updateReturnHeaderAction,
   updateReturnItemAction,
@@ -83,9 +85,11 @@ import {
 export function ReturnDetailView({
   detail,
   canEdit,
+  canDelete,
 }: {
   detail: ReturnDetail
   canEdit: boolean
+  canDelete: boolean
 }) {
   const router = useRouter()
 
@@ -120,6 +124,12 @@ export function ReturnDetailView({
     useState(false)
 
   const [reason, setReason] =
+    useState('')
+
+  const [permanentDeleteOpen, setPermanentDeleteOpen] =
+    useState(false)
+
+  const [deleteConfirmation, setDeleteConfirmation] =
     useState('')
 
   const [busy, setBusy] =
@@ -262,6 +272,46 @@ export function ReturnDetailView({
     router.refresh()
   }
 
+  const confirmPermanentDelete = async () => {
+    if (deleteConfirmation.trim() !== header.no_return) {
+      return toast.error(
+        'Ketik nomor Return dengan benar untuk melanjutkan.',
+      )
+    }
+
+    setBusy(true)
+
+    try {
+      const res = await deleteCancelledReturnAction(header.id)
+
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+
+      setPermanentDeleteOpen(false)
+      setDeleteConfirmation('')
+
+      if (res.data.photosCleanupFailed) {
+        toast.warning(
+          `Data ${res.data.no_return} sudah dihapus dari database, tetapi pembersihan foto belum seluruhnya berhasil. Periksa log server.`,
+        )
+      } else {
+        toast.success(
+          `${res.data.no_return} dan foto terkait berhasil dihapus permanen.`,
+        )
+      }
+
+      router.replace('/returns')
+    } catch {
+      toast.error(
+        'Terjadi kesalahan saat menghapus Return.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const info = [
     {
       label: 'Tanggal Penerimaan',
@@ -332,25 +382,43 @@ export function ReturnDetailView({
             </div>
           </div>
 
-          {editable && (
+                    {(editable || (canDelete && header.status === 'dibatalkan')) && (
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setHeaderOpen(true)}
-                className="gap-2"
-              >
-                <Pencil className="size-4" />
-                Edit Header
-              </Button>
+              {editable && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setHeaderOpen(true)}
+                    className="gap-2"
+                  >
+                    <Pencil className="size-4" />
+                    Edit Header
+                  </Button>
 
-              <Button
-                variant="outline"
-                onClick={() => setCancelOpen(true)}
-                className="gap-2 text-destructive hover:text-destructive"
-              >
-                <Ban className="size-4" />
-                Batalkan
-              </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCancelOpen(true)}
+                    className="gap-2 text-destructive hover:text-destructive"
+                  >
+                    <Ban className="size-4" />
+                    Batalkan
+                  </Button>
+                </>
+              )}
+
+              {canDelete && header.status === 'dibatalkan' && (
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setDeleteConfirmation('')
+                    setPermanentDeleteOpen(true)
+                  }}
+                  className="gap-2"
+                >
+                  <Trash2 className="size-4" />
+                  Hapus Permanen
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -693,6 +761,73 @@ export function ReturnDetailView({
               )}
 
               Hapus
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ======================================================
+          PERMANENT DELETE DIALOG
+          ====================================================== */}
+
+      <AlertDialog
+        open={permanentDeleteOpen}
+        onOpenChange={(open) => {
+          if (!busy) {
+            setPermanentDeleteOpen(open)
+            if (!open) setDeleteConfirmation('')
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <AlertTriangle className="size-5" />
+              </div>
+              Hapus Return Permanen?
+            </AlertDialogTitle>
+
+            <AlertDialogDescription>
+              Return{' '}
+              <strong className="font-mono text-foreground">
+                {header.no_return}
+              </strong>{' '}
+              akan dihapus dari database, termasuk item dan riwayat
+              terkait, beserta foto yang tersimpan di Storage.
+              Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="permanent-delete-confirmation">
+              Ketik nomor Return untuk mengonfirmasi
+            </Label>
+
+            <Input
+              id="permanent-delete-confirmation"
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder={header.no_return}
+              autoComplete="off"
+            />
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>
+              Kembali
+            </AlertDialogCancel>
+
+            <Button
+              variant="destructive"
+              onClick={confirmPermanentDelete}
+              disabled={
+                busy ||
+                deleteConfirmation.trim() !== header.no_return
+              }
+            >
+              {busy && <Loader2 className="animate-spin" />}
+              Hapus Permanen
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

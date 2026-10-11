@@ -5,10 +5,12 @@ import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth'
 import {
   canCreateReturn,
+  canDeleteReturn,
   canEditReturn,
 } from '@/lib/permissions'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 
 import type { ActionResult } from '@/lib/types'
 
@@ -1137,19 +1139,28 @@ export async function deleteReturnItemAction(
    ============================================================ */
 
 export async function cancelReturnAction(
-  returnId: string,
+  returnId: string | number,
   reason: string,
 ): Promise<ActionResult> {
   if (!isSupabaseConfigured) {
     return NOT_CONFIGURED
   }
 
-  if (!validId(returnId)) {
-    return {
-      ok: false,
-      error: 'ID return tidak valid.',
-    }
+  const rawReturnId = String(returnId ?? '').trim()
+
+const normalizedReturnId = /^\d+$/.test(rawReturnId)
+  ? Number(rawReturnId)
+  : Number.NaN
+
+if (
+  !Number.isSafeInteger(normalizedReturnId) ||
+  normalizedReturnId <= 0
+) {
+  return {
+    ok: false,
+    error: 'ID return tidak valid.',
   }
+}
 
   const cleanReason =
     reason?.trim().slice(
@@ -1186,7 +1197,7 @@ export async function cancelReturnAction(
     } = await supabase
       .from('return_headers')
       .select('id,status')
-      .eq('id', returnId)
+      .eq('id', normalizedReturnId)
       .maybeSingle()
 
     if (oldError) {
@@ -1262,7 +1273,7 @@ export async function cancelReturnAction(
 
     const historyError =
       await insertHistory(supabase, {
-        return_header_id: Number(returnId),
+        return_header_id: normalizedReturnId,
         user_id: auth.user.id,
         action: 'CANCEL',
         module: 'STATUS',
@@ -1297,6 +1308,208 @@ export async function cancelReturnAction(
   } catch (error) {
     console.error(
       '[cancelReturnAction]',
+      error,
+    )
+
+    return {
+      ok: false,
+      error: GENERIC_DB_ERROR,
+    }
+  }
+}
+
+/* ============================================================
+   DELETE CANCELLED RETURN PERMANENTLY
+   ============================================================ */
+
+export async function deleteCancelledReturnAction(
+  returnId: string | number,
+): Promise<
+  ActionResult<{
+    no_return: string
+    photosCleanupFailed: boolean
+  }>
+> {
+  if (!isSupabaseConfigured) {
+    return NOT_CONFIGURED
+  }
+
+  const rawReturnId = String(returnId ?? '').trim()
+  const normalizedReturnId = /^\d+$/.test(rawReturnId)
+    ? Number(rawReturnId)
+    : Number.NaN
+
+  if (
+    !Number.isSafeInteger(normalizedReturnId) ||
+    normalizedReturnId <= 0
+  ) {
+    return {
+      ok: false,
+      error: 'ID return tidak valid.',
+    }
+  }
+
+  const auth = await authorize(canDeleteReturn)
+
+  if ('error' in auth) {
+    return {
+      ok: false,
+      error: auth.error,
+    }
+  }
+
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.SUPABASE_URL
+
+  const secretKey =
+    process.env.SUPABASE_SECRET_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !secretKey) {
+    console.error(
+      '[deleteCancelledReturnAction] URL atau secret key server Supabase belum dikonfigurasi.',
+    )
+
+    return {
+      ok: false,
+      error:
+        'Fitur Hapus Permanen belum dikonfigurasi pada server.',
+    }
+  }
+
+  try {
+    const admin = createSupabaseAdminClient(
+      supabaseUrl,
+      secretKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      },
+    )
+
+    const { data, error } = await admin.rpc(
+      'delete_cancelled_return',
+      {
+        p_return_id: normalizedReturnId,
+      },
+    )
+
+    if (error) {
+      const message = error.message.toLowerCase()
+
+      if (message.includes('return_not_found')) {
+        return {
+          ok: false,
+          error: 'Data return tidak ditemukan.',
+        }
+      }
+
+      if (message.includes('return_not_cancelled')) {
+        return {
+          ok: false,
+          error:
+            'Hanya Return berstatus Dibatalkan yang boleh dihapus permanen.',
+        }
+      }
+
+      console.error(
+        '[deleteCancelledReturnAction] Database:',
+        error.message,
+      )
+
+      return {
+        ok: false,
+        error: friendlyDbError(error.message),
+      }
+    }
+
+    const deleted = data as unknown as {
+      id: number | string
+      no_return: string | null
+      foto_surat_jalan_url: string | null
+      foto_material_url: string | null
+    } | null
+
+    if (!deleted || deleted.id == null) {
+      console.error(
+        '[deleteCancelledReturnAction] Data penghapusan tidak dapat diverifikasi.',
+      )
+
+      return {
+        ok: false,
+        error:
+          'Hasil penghapusan belum dapat diverifikasi. Periksa database sebelum mencoba lagi.',
+      }
+    }
+
+    // Baris database sudah dihapus oleh RPC.
+    // Sekarang bersihkan file foto pada bucket yang sama.
+    const photoPaths: string[] = []
+    let photosCleanupFailed = false
+
+    for (const value of [
+      deleted.foto_surat_jalan_url,
+      deleted.foto_material_url,
+    ]) {
+      if (!value?.trim()) continue
+
+      const path = value.trim().replace(/^\/+/, '')
+
+      // Kolom berisi path objek dalam bucket, bukan URL bertoken.
+      if (
+        /^https?:\/\//i.test(path) ||
+        path.split('/').includes('..')
+      ) {
+        photosCleanupFailed = true
+        console.error(
+          '[deleteCancelledReturnAction] Path foto tidak valid untuk Storage.',
+        )
+        continue
+      }
+
+      if (!photoPaths.includes(path)) {
+        photoPaths.push(path)
+      }
+    }
+
+    if (photoPaths.length > 0) {
+      try {
+        const { error: storageError } = await admin.storage
+          .from('return-photos')
+          .remove(photoPaths)
+
+        if (storageError) {
+          photosCleanupFailed = true
+          console.error(
+            '[deleteCancelledReturnAction] Pembersihan foto gagal:',
+            storageError.message,
+          )
+        }
+      } catch (storageError) {
+        photosCleanupFailed = true
+        console.error(
+          '[deleteCancelledReturnAction] Storage exception:',
+          storageError,
+        )
+      }
+    }
+
+    revalidateReturns()
+    revalidatePath(`/returns/${normalizedReturnId}`)
+
+    return {
+      ok: true,
+      data: {
+        no_return: deleted.no_return ?? String(deleted.id),
+        photosCleanupFailed,
+      },
+    }
+  } catch (error) {
+    console.error(
+      '[deleteCancelledReturnAction]',
       error,
     )
 

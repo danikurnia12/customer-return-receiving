@@ -300,13 +300,12 @@ export function AppSidebar() {
                 "
               >
                 <Image
-                  src="/spindo 5.png"
-                  alt="SPINDO 5"
-                  width={44}
-                  height={44}
-                  priority
-                  className="size-full object-contain p-1"
-                />
+  src="/spindo 5.png"
+  alt="SPINDO 5"
+  width={44}
+  height={44}
+  className="size-full object-contain p-1"
+/>
               </div>
 
               {/* ==================================================

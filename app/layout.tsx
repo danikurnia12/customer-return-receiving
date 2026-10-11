@@ -23,9 +23,9 @@ icons: {
   icon: [
     { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
     { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-    { url: '/spindo 5.png' },
+    { url: '/logo-2.png' },
   ],
-  apple: '/spindo 5.png',
+  apple: '/logo-2.png',
 },
 }
 

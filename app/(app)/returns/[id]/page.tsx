@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, unstable_rethrow } from 'next/navigation'
 
 import {
   ErrorState,
@@ -12,7 +12,7 @@ import { ReturnDetailView } from '@/components/returns/return-detail'
 import { buttonVariants } from '@/components/ui/button'
 
 import { getCurrentUser } from '@/lib/auth'
-import { canEditReturn } from '@/lib/permissions'
+import { canDeleteReturn, canEditReturn } from '@/lib/permissions'
 
 import { getReturnDetail } from '@/lib/services/returns'
 
@@ -65,6 +65,7 @@ export default async function ReturnDetailPage({
           canEdit={canEditReturn(
             user?.role,
           )}
+          canDelete={canDeleteReturn(user?.role)}
         />
 
         <div className="flex">
@@ -80,6 +81,7 @@ export default async function ReturnDetailPage({
       </div>
     )
   } catch (error) {
+    unstable_rethrow(error)
     console.error(
       '[ReturnDetailPage] ERROR:',
       error,

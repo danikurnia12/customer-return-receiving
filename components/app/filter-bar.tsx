@@ -1,3 +1,4 @@
+
 'use client'
 
 import {
@@ -5,21 +6,13 @@ import {
   useRouter,
   useSearchParams,
 } from 'next/navigation'
-import {
-  useState,
-  useTransition,
-} from 'react'
-import {
-  Loader2,
-  RotateCcw,
-  Search,
-} from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Loader2, RotateCcw, Search } from 'lucide-react'
 
 import { STATUS_OPTIONS } from '@/components/app/badges'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
 import {
   Select,
   SelectContent,
@@ -60,14 +53,7 @@ export function FilterBar({
   )
 
   const apply = () => {
-    const values = {
-      q,
-      from,
-      to,
-      customer,
-      status,
-    }
-
+    const values = { q, from, to, customer, status }
     const next = new URLSearchParams()
 
     for (const [key, value] of Object.entries(values)) {
@@ -78,9 +64,7 @@ export function FilterBar({
 
     startTransition(() => {
       router.push(
-        next.toString()
-          ? `${pathname}?${next}`
-          : pathname,
+        next.toString() ? `${pathname}?${next}` : pathname,
       )
     })
   }
@@ -98,10 +82,7 @@ export function FilterBar({
   }
 
   const customerItems = [
-    {
-      value: ALL,
-      label: 'Semua Customer',
-    },
+    { value: ALL, label: 'Semua Customer' },
     ...(customers ?? []).map((customer) => ({
       value: customer,
       label: customer,
@@ -109,10 +90,7 @@ export function FilterBar({
   ]
 
   const statusItems = [
-    {
-      value: ALL,
-      label: 'Semua Status',
-    },
+    { value: ALL, label: 'Semua Status' },
     ...STATUS_OPTIONS,
   ]
 
@@ -123,123 +101,70 @@ export function FilterBar({
         apply()
       }}
       className="
-        flex
-        w-full
-        items-end
-        gap-1.5
-        rounded-md
-        border
-        bg-card
-        px-2
-        py-1.5
+        grid grid-cols-2 items-end gap-2
+        rounded-md border bg-card p-3
+        sm:flex sm:flex-wrap sm:gap-2
       "
     >
-      {/* SEARCH */}
       {showSearch && (
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1 sm:min-w-[220px] sm:flex-1">
           <Label
             htmlFor="filter-q"
-            className="text-[10px] leading-3 text-muted-foreground"
+            className="text-xs text-muted-foreground"
           >
             Pencarian
           </Label>
 
-          <div className="relative">
-            <Search
-              className="
-                pointer-events-none
-                absolute
-                left-2
-                top-1/2
-                size-3
-                -translate-y-1/2
-                text-muted-foreground
-              "
-            />
+          <div className="relative min-w-0">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 
             <Input
               id="filter-q"
               value={q}
-              onChange={(event) =>
-                setQ(event.target.value)
-              }
+              onChange={(event) => setQ(event.target.value)}
               placeholder={searchPlaceholder}
-              className="
-                h-7
-                min-h-7
-                rounded-md
-                border
-                px-2
-                pl-6
-                text-[11px]
-                leading-none
-              "
+              className="h-9 w-full min-w-0 pl-8 text-sm"
             />
           </div>
         </div>
       )}
 
-      {/* FROM */}
-      <div className="flex shrink-0 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-col gap-1 sm:w-[118px] sm:shrink-0">
         <Label
           htmlFor="filter-from"
-          className="text-[10px] leading-3 text-muted-foreground"
+          className="text-xs text-muted-foreground"
         >
           Dari
         </Label>
-
         <Input
           id="filter-from"
           type="date"
           value={from}
-          onChange={(event) =>
-            setFrom(event.target.value)
-          }
-          className="
-            h-7
-            min-h-7
-            w-[118px]
-            rounded-md
-            px-1.5
-            text-[10px]
-            leading-none
-          "
+          onChange={(event) => setFrom(event.target.value)}
+          className="h-9 w-full min-w-0 px-1.5 text-xs"
         />
       </div>
 
-      {/* TO */}
-      <div className="flex shrink-0 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-col gap-1 sm:w-[118px] sm:shrink-0">
         <Label
           htmlFor="filter-to"
-          className="text-[10px] leading-3 text-muted-foreground"
+          className="text-xs text-muted-foreground"
         >
           Sampai
         </Label>
-
         <Input
           id="filter-to"
           type="date"
           value={to}
           min={from || undefined}
-          onChange={(event) =>
-            setTo(event.target.value)
-          }
-          className="
-            h-7
-            min-h-7
-            w-[118px]
-            rounded-md
-            px-1.5
-            text-[10px]
-            leading-none
-          "
+          onChange={(event) => setTo(event.target.value)}
+          className="h-9 w-full min-w-0 px-1.5 text-xs"
         />
       </div>
 
-      {/* CUSTOMER */}
       {showCustomer && (
-        <div className="flex w-[145px] shrink-0 flex-col gap-0.5">
-          <Label className="text-[10px] leading-3 text-muted-foreground">
+        <div className="flex min-w-0 flex-col gap-1 sm:w-[145px] sm:shrink-0">
+          <Label className="text-xs text-muted-foreground">
             Customer
           </Label>
 
@@ -252,14 +177,7 @@ export function FilterBar({
           >
             <SelectTrigger
               aria-label="Filter customer"
-              className="
-                h-7
-                min-h-7
-                w-full
-                rounded-md
-                px-2
-                text-[10px]
-              "
+              className="h-9 w-full min-w-0 px-2 text-xs"
             >
               <SelectValue />
             </SelectTrigger>
@@ -279,10 +197,9 @@ export function FilterBar({
         </div>
       )}
 
-      {/* STATUS */}
       {showStatus && (
-        <div className="flex w-[125px] shrink-0 flex-col gap-0.5">
-          <Label className="text-[10px] leading-3 text-muted-foreground">
+        <div className="flex min-w-0 flex-col gap-1 sm:w-[125px] sm:shrink-0">
+          <Label className="text-xs text-muted-foreground">
             Status
           </Label>
 
@@ -295,14 +212,7 @@ export function FilterBar({
           >
             <SelectTrigger
               aria-label="Filter status"
-              className="
-                h-7
-                min-h-7
-                w-full
-                rounded-md
-                px-2
-                text-[10px]
-              "
+              className="h-9 w-full min-w-0 px-2 text-xs"
             >
               <SelectValue />
             </SelectTrigger>
@@ -322,47 +232,27 @@ export function FilterBar({
         </div>
       )}
 
-      {/* BUTTON APPLY */}
       <Button
         type="submit"
         disabled={pending}
-        className="
-          h-7
-          min-h-7
-          shrink-0
-          gap-1
-          rounded-md
-          px-2.5
-          text-[10px]
-          font-semibold
-        "
+        className="h-9 w-full min-w-0 gap-1 px-2 text-xs sm:w-auto sm:shrink-0 sm:px-3"
       >
         {pending ? (
-          <Loader2 className="size-3 animate-spin" />
+          <Loader2 className="size-4 animate-spin" />
         ) : (
-          <Search className="size-3" />
+          <Search className="size-4" />
         )}
         Terapkan
       </Button>
 
-      {/* BUTTON RESET */}
       <Button
         type="button"
         variant="outline"
         onClick={reset}
         disabled={pending}
-        className="
-          h-7
-          min-h-7
-          shrink-0
-          gap-1
-          rounded-md
-          px-2.5
-          text-[10px]
-          font-semibold
-        "
+        className="h-9 w-full min-w-0 gap-1 px-2 text-xs sm:w-auto sm:shrink-0 sm:px-3"
       >
-        <RotateCcw className="size-3" />
+        <RotateCcw className="size-4" />
         Reset
       </Button>
     </form>

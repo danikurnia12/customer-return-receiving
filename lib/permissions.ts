@@ -25,3 +25,7 @@ export function canEditReturn(role?: Role | null) {
 export function canManageUsers(role?: Role | null) {
   return role === 'master_data'
 }
+
+export function canDeleteReturn(role?: Role | null) {
+  return role === 'master_data'
+}
