@@ -174,6 +174,16 @@ export interface DashboardData {
 
   chartMode: 'day' | 'month'
 
+    /*
+   * Grafik Qty Aktual per lokasi per bulan.
+   */
+  locationChart: Record<string, string | number>[]
+
+  locationSeries: {
+    dataKey: string
+    name: string
+  }[]
+
   /*
    * Grafik status return.
    */
@@ -228,12 +238,133 @@ export async function getDashboardData(
         'dibatalkan',
     )
 
+  const locationItems: {return_header_id: string
+    location: string | null
+    qty_aktual: number}[] = []
+
+  const activeIds = active.map(
+    (row) => row.id,
+  )
+
+  if (activeIds.length > 0) {
+    const supabase = await createClient()
+
+    const {
+      data: items,
+      error: itemsError,
+    } = await supabase
+      .from('return_items')
+      .select(
+        'return_header_id, location, qty_aktual',
+      )
+      .in('return_header_id', activeIds)
+
+    if (itemsError) {
+      throw new Error(
+        `Gagal mengambil data Qty Location: ${itemsError.message}`,
+      )
+    }
+
+    locationItems.push(...(items ?? []).map((item) => ({
+        return_header_id: String(
+          item.return_header_id,
+        ),
+        location: item.location,
+        qty_aktual: Number(
+          item.qty_aktual ?? 0,
+        ),
+      })),
+    )
+  }
+
+  const dateByHeader = new Map(
+    active.map((row) => [
+      String(row.id),
+      row.tanggal_penerimaan,
+    ]),
+  )
+
+  const locationBuckets = new Map<
+    string,
+    Map<string, number>
+  >()
+
+  for (const item of locationItems) {
+    const date = dateByHeader.get(
+      item.return_header_id,
+    )
+
+    if (!date) continue
+
+    const month = date.slice(0, 7)
+    const location =
+      item.location?.trim() ||
+      'Lokasi Tidak Diisi'
+
+    if (!locationBuckets.has(month)) {
+      locationBuckets.set(
+        month,
+        new Map<string, number>(),
+      )
+    }
+
+    const bucket =
+      locationBuckets.get(month)!
+
+    bucket.set(
+      location,
+      (bucket.get(location) ?? 0) +
+        item.qty_aktual,
+    )
+  }
+
+  const locationTotals =
+    new Map<string, number>()
+
+  for (const bucket of locationBuckets.values()) {
+    for (const [location, qty] of bucket) {
+      locationTotals.set(
+        location,
+        (locationTotals.get(location) ?? 0) +
+          qty,
+      )
+    }
+  }
+
+  const locationSeries = Array.from(
+    locationTotals.entries(),
+  )
+    .sort((a, b) => b[1] - a[1])
+    .map(([name], index) => ({
+      dataKey: `location${index}`,
+      name,
+    }))
+
+  const locationChart: Record<
+    string,
+    string | number
+  >[] = Array.from(
+    locationBuckets.entries(),
+  )
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, bucket]) => {
+      const point: Record<
+        string,
+        string | number
+      > = { key }
+
+      for (const series of locationSeries) {
+        point[series.dataKey] =
+          bucket.get(series.name) ?? 0
+      }
+
+      return point
+    })
   /*
    * ==========================================================
    * MODE GRAFIK TREND
    * ==========================================================
    */
-
   const spanDays =
     rangeInDays(
       filters.from,
@@ -451,6 +582,9 @@ export async function getDashboardData(
     statusChart,
 
     customerChart,
+
+    locationChart,
+locationSeries,
 
     recent:
       rows.slice(0, 10),

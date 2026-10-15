@@ -36,6 +36,7 @@ import {
 } from '@/components/returns/item-dialog'
 
 import { ItemsTable } from '@/components/returns/items-table'
+import { DownloadReturnReport } from '@/components/returns/download-return-report'
 
 import {
   AlertDialog,
@@ -394,6 +395,7 @@ export function ReturnDetailView({
                     <Pencil className="size-4" />
                     Edit Header
                   </Button>
+                  <DownloadReturnReport detail={detail} />
 
                   <Button
                     variant="outline"

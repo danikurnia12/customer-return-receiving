@@ -1,498 +1,498 @@
 'use server'
 
+import { getCurrentUser } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
 import { askGemini } from '@/lib/services/ai'
-import { listReturnSummaries } from '@/lib/services/returns'
 
-type TrendItem = {
-  period: string
+type Metrics = {
   totalReturn: number
   totalQty: number
   totalItem: number
   totalSelisih: number
 }
 
+type TrendItem = Metrics & {
+  period: string
+}
+
+type PeriodComparison = {
+  title: string
+  currentLabel: string
+  previousLabel: string
+  current: Metrics
+  previous: Metrics
+  change: Record<
+    keyof Metrics,
+    { value: number; percent: number | null }
+  >
+}
+
+const ZERO_METRICS: Metrics = {
+  totalReturn: 0,
+  totalQty: 0,
+  totalItem: 0,
+  totalSelisih: 0,
+}
+
+const SUMMARY_COLUMNS =
+  'id, no_return, tanggal_penerimaan, customer, status, item_count, total_qty_aktual, selisih_count'
+
+function getJakartaToday(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  )
+
+  return `${values.year}-${values.month}-${values.day}`
+}
+
+function parseDate(value: string | null): string | null {
+  if (!value) return null
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return `${match[1]}-${match[2]}-${match[3]}`
+}
+
+function shiftDate(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function monthStart(value: string): string {
+  return `${value.slice(0, 7)}-01`
+}
+
+function previousMonthStart(value: string): string {
+  const date = new Date(`${monthStart(value)}T00:00:00Z`)
+  date.setUTCMonth(date.getUTCMonth() - 1)
+  return date.toISOString().slice(0, 10)
+}
+
+function daysInMonth(value: string): number {
+  const [year, month] = value.split('-').map(Number)
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
+}
+
+function mondayStart(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`)
+  const day = date.getUTCDay()
+  const daysSinceMonday = (day + 6) % 7
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday)
+  return date.toISOString().slice(0, 10)
+}
+
+function labelDate(value: string): string {
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString(
+    'id-ID',
+    {
+      timeZone: 'UTC',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    },
+  )
+}
+
+function labelMonth(value: string): string {
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString(
+    'id-ID',
+    {
+      timeZone: 'UTC',
+      month: 'long',
+      year: 'numeric',
+    },
+  )
+}
+
+function calculateMetrics(
+  rows: Array<{
+    total_qty_aktual?: number | string | null
+    item_count?: number | string | null
+    selisih_count?: number | string | null
+  }>,
+): Metrics {
+  return {
+    totalReturn: rows.length,
+    totalQty: rows.reduce(
+      (sum, row) => sum + Number(row.total_qty_aktual ?? 0),
+      0,
+    ),
+    totalItem: rows.reduce(
+      (sum, row) => sum + Number(row.item_count ?? 0),
+      0,
+    ),
+    totalSelisih: rows.filter(
+      (row) => Number(row.selisih_count ?? 0) > 0,
+    ).length,
+  }
+}
+
+function makeComparison(
+  title: string,
+  currentLabel: string,
+  previousLabel: string,
+  currentRows: typeof activeRowsType,
+  previousRows: typeof activeRowsType,
+): PeriodComparison {
+  const current = calculateMetrics(currentRows)
+  const previous = calculateMetrics(previousRows)
+
+  const keys: (keyof Metrics)[] = [
+    'totalReturn',
+    'totalQty',
+    'totalItem',
+    'totalSelisih',
+  ]
+
+  const change = Object.fromEntries(
+    keys.map((key) => {
+      const difference = current[key] - previous[key]
+
+      return [
+        key,
+        {
+          value: difference,
+          percent:
+            previous[key] === 0
+              ? null
+              : (difference / previous[key]) * 100,
+        },
+      ]
+    }),
+  ) as PeriodComparison['change']
+
+  return {
+    title,
+    currentLabel,
+    previousLabel,
+    current,
+    previous,
+    change,
+  }
+}
+
+type ActiveRow = {
+  tanggal_penerimaan: string | null
+  customer: string | null
+  status: string
+  item_count: number | string | null
+  total_qty_aktual: number | string | null
+  selisih_count: number | string | null
+}
+
+// Digunakan agar tipe baris tetap sama pada kedua periode.
+type typeofActiveRowsType = ActiveRow[]
+const activeRowsType: typeofActiveRowsType = []
+
 export async function testGeminiAction() {
   try {
+    // Pastikan pengguna sudah login sebelum memanggil Gemini.
+    const user = await getCurrentUser()
+
+    if (!user) {
+      return {
+        success: false,
+        message: 'Sesi berakhir. Silakan login kembali.',
+      }
+    }
+
     const result = await askGemini(
-      'Jawab singkat dalam bahasa Indonesia: apakah kamu berhasil terhubung?'
+      'Jawab singkat dalam bahasa Indonesia: apakah kamu berhasil terhubung?',
     )
 
-    return {
-      success: true,
-      message: result,
-    }
+    return { success: true, message: result }
   } catch (error) {
     console.error('[AI] Gemini error:', error)
 
     return {
       success: false,
       message:
-        error instanceof Error
-          ? error.message
-          : String(error),
+        error instanceof Error ? error.message : String(error),
     }
   }
 }
 
 export async function getReturnAIInsight() {
   try {
-    /*
-     * ============================================================
-     * 1. AMBIL DATA RETURN
-     * ============================================================
-     *
-     * Hanya membaca data.
-     * Tidak ada INSERT / UPDATE / DELETE.
-     */
-    const rows = await listReturnSummaries({}, 500)
+    // Pastikan pengguna sudah login sebelum membaca data Return.
+    const user = await getCurrentUser()
 
-    /*
-     * ============================================================
-     * 2. JIKA BELUM ADA DATA
-     * ============================================================
-     */
-    if (rows.length === 0) {
+    if (!user) {
       return {
-        success: true,
-        message:
-          'Belum ada data Return yang dapat dianalisis.',
-
-        kpi: {
-          totalReturn: 0,
-          totalQty: 0,
-          totalItem: 0,
-          totalSelisih: 0,
-        },
-
-        trend: [],
+        success: false,
+        message: 'Sesi berakhir. Silakan login kembali.',
       }
     }
 
-    /*
-     * ============================================================
-     * 3. FILTER RETURN AKTIF
-     * ============================================================
-     *
-     * Return dengan status "dibatalkan" tidak ikut dianalisis.
-     */
-    const activeRows = rows.filter(
-      (row) => row.status !== 'dibatalkan'
-    )
+    const supabase = await createClient()
 
     /*
-     * ============================================================
-     * 4. KPI UTAMA
-     * ============================================================
+     * Ambil seluruh histori secara bertahap.
+     * Batas 500 berlaku per batch, bukan total histori.
      */
+    const pageSize = 500
+    const rawRows: ActiveRow[] = []
 
-    const totalReturn = activeRows.length
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from('return_summary')
+        .select(SUMMARY_COLUMNS)
+        .order('tanggal_penerimaan', { ascending: true })
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1)
 
-    const totalQty = activeRows.reduce(
-      (sum, row) =>
-        sum + Number(row.total_qty_aktual ?? 0),
-      0
-    )
+      if (error) throw new Error(error.message)
 
-    const totalItem = activeRows.reduce(
-      (sum, row) =>
-        sum + Number(row.item_count ?? 0),
-      0
-    )
+      const batch = data ?? []
+      rawRows.push(...(batch as unknown as ActiveRow[]))
 
-    const totalSelisih = activeRows.filter(
-      (row) => Number(row.selisih_count ?? 0) > 0
-    ).length
-
-    /*
-     * ============================================================
-     * 5. TREND RETURN PER BULAN
-     * ============================================================
-     *
-     * Data dikelompokkan berdasarkan tanggal penerimaan.
-     *
-     * Contoh:
-     *
-     * Oktober 2026
-     * - Return: 10
-     * - Qty: 5.200
-     * - Item: 18
-     * - Selisih: 2
-     *
-     * September 2026
-     * - Return: 7
-     * - Qty: 3.800
-     * - Item: 12
-     * - Selisih: 1
-     */
-
-    const trendMap = new Map<
-      string,
-      {
-        period: string
-        year: number
-        month: number
-        totalReturn: number
-        totalQty: number
-        totalItem: number
-        totalSelisih: number
-      }
-    >()
-
-    for (const row of activeRows) {
-      if (!row.tanggal_penerimaan) {
-        continue
-      }
-
-      const date = new Date(row.tanggal_penerimaan)
-
-      if (Number.isNaN(date.getTime())) {
-        continue
-      }
-
-      const year = date.getFullYear()
-      const month = date.getMonth()
-
-      /*
-       * Key menggunakan YYYY-MM agar setiap bulan
-       * tetap unik dan mudah diurutkan.
-       */
-      const key = `${year}-${String(month + 1).padStart(2, '0')}`
-
-      const period = date.toLocaleDateString('id-ID', {
-        month: 'short',
-        year: 'numeric',
-      })
-
-      const existing = trendMap.get(key)
-
-      if (existing) {
-        existing.totalReturn += 1
-
-        existing.totalQty += Number(
-          row.total_qty_aktual ?? 0
-        )
-
-        existing.totalItem += Number(
-          row.item_count ?? 0
-        )
-
-        if (Number(row.selisih_count ?? 0) > 0) {
-          existing.totalSelisih += 1
-        }
-      } else {
-        trendMap.set(key, {
-          period,
-          year,
-          month,
-          totalReturn: 1,
-          totalQty: Number(
-            row.total_qty_aktual ?? 0
-          ),
-          totalItem: Number(
-            row.item_count ?? 0
-          ),
-          totalSelisih:
-            Number(row.selisih_count ?? 0) > 0
-              ? 1
-              : 0,
-        })
-      }
+      if (batch.length < pageSize) break
     }
 
-    /*
-     * ============================================================
-     * 6. URUTKAN TREND DARI LAMA → BARU
-     * ============================================================
-     */
-
-    const trend: TrendItem[] = Array.from(
-      trendMap.values()
-    )
-      .sort((a, b) => {
-        if (a.year !== b.year) {
-          return a.year - b.year
-        }
-
-        return a.month - b.month
-      })
-      .map((item) => ({
-        period: item.period,
-        totalReturn: item.totalReturn,
-        totalQty: item.totalQty,
-        totalItem: item.totalItem,
-        totalSelisih: item.totalSelisih,
+    const rows = rawRows
+      .filter((row) => row.status !== 'dibatalkan')
+      .map((row) => ({
+        ...row,
+        tanggal_penerimaan: parseDate(row.tanggal_penerimaan),
       }))
 
-    /*
-     * ============================================================
-     * 7. TOP CUSTOMER
-     * ============================================================
-     */
+    const today = getJakartaToday()
+    const currentMonthStart = monthStart(today)
+    const previousMonthFirst = previousMonthStart(today)
+    const currentMonthDay = Number(today.slice(8, 10))
+    const previousMonthDay = Math.min(
+      currentMonthDay,
+      daysInMonth(previousMonthFirst),
+    )
 
-    const customerCount = new Map<string, number>()
+    const currentMonthEnd = today
+    const previousMonthEnd = `${previousMonthFirst.slice(0, 7)}-${String(
+      previousMonthDay,
+    ).padStart(2, '0')}`
 
-    for (const row of activeRows) {
-      const customer =
-        row.customer?.trim() ||
-        'Customer Tidak Diisi'
+    const currentWeekStart = mondayStart(today)
+    const elapsedWeekDays =
+      Math.floor(
+        (Date.parse(`${today}T00:00:00Z`) -
+          Date.parse(`${currentWeekStart}T00:00:00Z`)) /
+          86400000,
+      ) + 1
 
-      customerCount.set(
+    const previousWeekStart = shiftDate(currentWeekStart, -7)
+    const previousWeekEnd = shiftDate(
+      previousWeekStart,
+      elapsedWeekDays - 1,
+    )
+
+    const inRange = (
+      start: string,
+      end: string,
+    ) =>
+      rows.filter(
+        (row) =>
+          row.tanggal_penerimaan !== null &&
+          row.tanggal_penerimaan >= start &&
+          row.tanggal_penerimaan <= end,
+      )
+
+    const comparisons: PeriodComparison[] = [
+      makeComparison(
+        'Perbandingan Bulanan',
+        `${labelDate(currentMonthStart)} – ${labelDate(currentMonthEnd)}`,
+        `${labelDate(previousMonthFirst)} – ${labelDate(previousMonthEnd)}`,
+        inRange(currentMonthStart, currentMonthEnd),
+        inRange(previousMonthFirst, previousMonthEnd),
+      ),
+      makeComparison(
+        'Perbandingan Mingguan',
+        `${labelDate(currentWeekStart)} – ${labelDate(today)}`,
+        `${labelDate(previousWeekStart)} – ${labelDate(previousWeekEnd)}`,
+        inRange(currentWeekStart, today),
+        inRange(previousWeekStart, previousWeekEnd),
+      ),
+    ]
+
+    const datedRows = rows.filter(
+      (row) => row.tanggal_penerimaan !== null,
+    )
+
+    const kpi = calculateMetrics(rows)
+
+    const trendMap = new Map<string, TrendItem>()
+
+    for (const row of datedRows) {
+      const date = row.tanggal_penerimaan!
+      const key = date.slice(0, 7)
+      const period = labelMonth(`${key}-01`)
+      const existing = trendMap.get(key)
+
+      const rowMetrics = calculateMetrics([row])
+
+      if (existing) {
+        existing.totalReturn += rowMetrics.totalReturn
+        existing.totalQty += rowMetrics.totalQty
+        existing.totalItem += rowMetrics.totalItem
+        existing.totalSelisih += rowMetrics.totalSelisih
+      } else {
+        trendMap.set(key, { period, ...rowMetrics })
+      }
+    }
+
+    const trend = Array.from(trendMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, item]) => item)
+
+    const customerCounts = new Map<string, number>()
+
+    for (const row of datedRows) {
+      const customer = row.customer?.trim() || 'Customer Tidak Diisi'
+      customerCounts.set(
         customer,
-        (customerCount.get(customer) ?? 0) + 1
+        (customerCounts.get(customer) ?? 0) + 1,
       )
     }
 
-    const topCustomers = Array.from(
-      customerCount.entries()
-    )
+    const topCustomers = Array.from(customerCounts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
 
-    /*
-     * ============================================================
-     * 8. STATUS RETURN
-     * ============================================================
-     */
+    const comparisonSummary = comparisons
+      .map((comparison) => {
+        const lines = [
+          `${comparison.title}:`,
+          `Periode berjalan (${comparison.currentLabel}): ${comparison.current.totalReturn} Return, ${comparison.current.totalItem} Item, ${comparison.current.totalQty} Qty Aktual, ${comparison.current.totalSelisih} Return berselisih.`,
+          `Periode pembanding (${comparison.previousLabel}): ${comparison.previous.totalReturn} Return, ${comparison.previous.totalItem} Item, ${comparison.previous.totalQty} Qty Aktual, ${comparison.previous.totalSelisih} Return berselisih.`,
+        ]
 
-    const statusCount = new Map<string, number>()
+        for (const key of [
+          'totalReturn',
+          'totalQty',
+          'totalItem',
+          'totalSelisih',
+        ] as const) {
+          const delta = comparison.change[key]
+          const metricNames = {
+            totalReturn: 'Return',
+            totalQty: 'Qty Aktual',
+            totalItem: 'Item',
+            totalSelisih: 'Return berselisih',
+          }
 
-    for (const row of activeRows) {
-      const status =
-        row.status?.trim() ||
-        'Belum Ada Status'
+          lines.push(
+            `${metricNames[key]}: perubahan ${delta.value >= 0 ? '+' : ''}${delta.value}; ${
+              delta.percent === null
+                ? 'persentase tidak dapat dihitung karena periode pembanding bernilai nol'
+                : `${delta.percent.toFixed(1)}%`
+            }.`,
+          )
+        }
 
-      statusCount.set(
-        status,
-        (statusCount.get(status) ?? 0) + 1
-      )
-    }
-
-    const statusSummary = Array.from(
-      statusCount.entries()
-    )
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-
-    /*
-     * ============================================================
-     * 9. DATA TREND UNTUK GEMINI
-     * ============================================================
-     */
+        return lines.join('\n')
+      })
+      .join('\n\n')
 
     const trendSummary =
       trend.length > 0
         ? trend
             .map(
               (item) =>
-                `- ${item.period}: ${item.totalReturn} Return, ${item.totalItem} Item, ${item.totalQty} Qty, ${item.totalSelisih} Return memiliki selisih`
+                `- ${item.period}: ${item.totalReturn} Return, ${item.totalItem} Item, ${item.totalQty} Qty Aktual, ${item.totalSelisih} Return berselisih`,
             )
             .join('\n')
-        : '- Belum ada data tren'
+        : '- Belum ada data bertanggal'
 
-    /*
-     * ============================================================
-     * 10. PROMPT GEMINI
-     * ============================================================
-     */
+    const customerSummary =
+      topCustomers.length > 0
+        ? topCustomers
+            .map(([customer, count]) => `- ${customer}: ${count} Return`)
+            .join('\n')
+        : '- Belum ada data customer'
 
     const prompt = `
-Kamu adalah AI Analyst untuk aplikasi
-"Customer Return Receiving".
+Kamu adalah analis data untuk aplikasi Customer Return Receiving.
 
-Tugas kamu adalah menganalisis data Return yang diberikan
-oleh sistem.
+Analisis ringkasan agregat yang disiapkan aplikasi berikut.
+Jangan meminta atau mengasumsikan akses database.
+Gunakan hanya angka dan fakta yang tersedia.
+Jangan mengarang penyebab kenaikan, penurunan, atau selisih.
+Jika penyebab tidak tersedia, katakan demikian.
+Return berstatus dibatalkan sudah dikecualikan oleh aplikasi.
 
-Gunakan HANYA data yang tersedia di bawah ini.
+KPI keseluruhan:
+- Total Return aktif: ${kpi.totalReturn}
+- Total item: ${kpi.totalItem}
+- Total Qty Aktual: ${kpi.totalQty}
+- Return dengan selisih: ${kpi.totalSelisih}
 
-Jangan mengarang:
-- angka
-- customer
-- status
-- periode
-- penyebab Return
-- penyebab kenaikan atau penurunan
-- informasi operasional yang tidak diberikan
+PERBANDINGAN PERIODE YANG DIHITUNG APLIKASI:
+${comparisonSummary}
 
-Jika suatu informasi tidak tersedia, katakan bahwa
-informasi tersebut tidak tersedia.
+CATATAN PERIODE:
+- Bulanan membandingkan bulan berjalan sampai hari ini dengan jumlah hari yang sama pada bulan sebelumnya.
+- Mingguan menggunakan Senin sebagai awal minggu dan membandingkan jumlah hari yang sama pada minggu sebelumnya.
+- Nilai persentase tidak tersedia bila pembanding bernilai nol.
+- Periode berjalan mungkin belum lengkap.
 
-========================
-DATA RETURN
-========================
-
-Total Return aktif:
-${totalReturn}
-
-Total item:
-${totalItem}
-
-Total quantity aktual:
-${totalQty}
-
-Return yang memiliki selisih quantity:
-${totalSelisih}
-
-========================
-TREND RETURN PER PERIODE
-========================
-
+TREND BULANAN:
 ${trendSummary}
 
-========================
-TOP CUSTOMER
-========================
+CUSTOMER DENGAN RETURN TERBANYAK:
+${customerSummary}
 
-${
-  topCustomers.length > 0
-    ? topCustomers
-        .map(
-          ([customer, count]) =>
-            `- ${customer}: ${count} Return`
-        )
-        .join('\n')
-    : '- Belum ada data customer'
-}
+Susun jawaban profesional dan ringkas dalam bahasa Indonesia dengan bagian:
+## Ringkasan untuk Supervisor
+## Perbandingan Bulanan dan Mingguan
+## Tren dan Customer Dominan
+## Hal yang Perlu Diperhatikan
+## Kesimpulan dan Tindak Lanjut
 
-========================
-STATUS RETURN
-========================
-
-${
-  statusSummary.length > 0
-    ? statusSummary
-        .map(
-          ([status, count]) =>
-            `- ${status}: ${count} Return`
-        )
-        .join('\n')
-    : '- Belum ada data status'
-}
-
-========================
-ATURAN ANALISIS TREND
-========================
-
-Analisis perubahan jumlah Return antar periode.
-
-Jika terdapat kenaikan:
-- sebutkan periode sebelumnya
-- sebutkan periode berikutnya
-- sebutkan angka Return masing-masing
-
-Jika terdapat penurunan:
-- sebutkan periode sebelumnya
-- sebutkan periode berikutnya
-- sebutkan angka Return masing-masing
-
-Jangan menyimpulkan penyebab kenaikan atau penurunan
-jika penyebab tersebut tidak tersedia di dalam data.
-
-Jangan mengatakan kondisi operasional perusahaan secara
-keseluruhan hanya berdasarkan data Return yang terbatas.
-
-Gunakan kalimat seperti:
-"Berdasarkan data Return yang tersedia..."
-
-========================
-FORMAT JAWABAN
-========================
-
-Berikan analisis dalam bahasa Indonesia.
-
-Gunakan struktur:
-
-## Kondisi Umum
-
-Jelaskan kondisi Return berdasarkan data yang tersedia.
-
-## Tren Return
-
-Jelaskan perubahan jumlah Return antar periode.
-
-Sebutkan periode dengan jumlah Return tertinggi
-jika memang dapat ditentukan dari data.
-
-Jika terdapat kenaikan atau penurunan yang terlihat,
-jelaskan berdasarkan angka yang tersedia.
-
-## Customer Dominan
-
-Sebutkan customer dengan jumlah Return terbanyak.
-
-## Perhatian
-
-Jelaskan hal yang perlu diperhatikan, terutama terkait:
-- selisih quantity
-- perubahan jumlah Return
-- kondisi data
-
-## Kesimpulan
-
-Berikan kesimpulan singkat dan praktis.
-
-Gunakan bahasa profesional, singkat, dan mudah dipahami
-oleh supervisor atau manager.
+Utamakan angka hasil perhitungan aplikasi. Jangan menghitung ulang atau mengubah angka.
+Jangan menyimpulkan penyebab tanpa bukti. Tindak lanjut harus praktis dan tidak mengasumsikan penyebab yang belum diketahui.
 `
-
-    /*
-     * ============================================================
-     * 11. PANGGIL GEMINI
-     * ============================================================
-     */
 
     const insight = await askGemini(prompt)
 
-    /*
-     * ============================================================
-     * 12. HASIL
-     * ============================================================
-     *
-     * KPI dan trend dihitung oleh aplikasi.
-     * Gemini hanya menghasilkan insight/analisis.
-     */
-
     return {
       success: true,
-
       message: insight,
-
-      kpi: {
-        totalReturn,
-        totalQty,
-        totalItem,
-        totalSelisih,
-      },
-
+      kpi,
       trend,
+      comparisons,
     }
   } catch (error) {
-    /*
-     * ============================================================
-     * 13. ERROR HANDLING
-     * ============================================================
-     */
-
-    console.error(
-      '[AI] Return insight error:',
-      error
-    )
+    console.error('[AI] Return insight error:', error)
 
     return {
       success: false,
-
       message:
         error instanceof Error
           ? error.message
           : 'Gagal menganalisis data Return.',
-
-      kpi: {
-        totalReturn: 0,
-        totalQty: 0,
-        totalItem: 0,
-        totalSelisih: 0,
-      },
-
+      kpi: { ...ZERO_METRICS },
       trend: [],
+      comparisons: [],
     }
   }
 }

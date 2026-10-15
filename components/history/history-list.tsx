@@ -6,6 +6,8 @@ import {
   ArrowRight,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardEdit,
   Clock3,
   FileText,
@@ -13,12 +15,12 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatNumber } from '@/lib/format'
 import type { ReturnHistoryEntry } from '@/lib/types'
 
-function renderValue(
-  value: unknown,
-): string {
+const HISTORY_PAGE_SIZE = 10
+
+function renderValue(value: unknown): string {
   if (
     value === null ||
     value === undefined ||
@@ -27,18 +29,10 @@ function renderValue(
     return '-'
   }
 
-  if (
-    typeof value === 'object'
-  ) {
-    const obj =
-      value as Record<
-        string,
-        unknown
-      >
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
 
-    if (
-      'diameter' in obj
-    ) {
+    if ('diameter' in obj) {
       return `${obj.diameter ?? '-'} × ${
         obj.tebal ?? '-'
       } × ${
@@ -50,19 +44,14 @@ function renderValue(
       }`
     }
 
-    return JSON.stringify(
-      value,
-    )
+    return JSON.stringify(value)
   }
 
   return String(value)
 }
 
-function getActionStyle(
-  action: string,
-) {
-  const value =
-    action.toLowerCase()
+function getActionStyle(action: string) {
+  const value = action.toLowerCase()
 
   if (
     value.includes('create') ||
@@ -72,8 +61,7 @@ function getActionStyle(
     return {
       badge:
         'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-      dot:
-        'bg-emerald-500',
+      dot: 'bg-emerald-500',
       icon:
         'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
     }
@@ -87,8 +75,7 @@ function getActionStyle(
     return {
       badge:
         'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-      dot:
-        'bg-blue-500',
+      dot: 'bg-blue-500',
       icon:
         'bg-blue-500/10 text-blue-600 dark:text-blue-400',
     }
@@ -103,8 +90,7 @@ function getActionStyle(
     return {
       badge:
         'bg-red-500/10 text-red-700 dark:text-red-400',
-      dot:
-        'bg-red-500',
+      dot: 'bg-red-500',
       icon:
         'bg-red-500/10 text-red-600 dark:text-red-400',
     }
@@ -117,20 +103,16 @@ function getActionStyle(
     return {
       badge:
         'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-      dot:
-        'bg-amber-500',
+      dot: 'bg-amber-500',
       icon:
         'bg-amber-500/10 text-amber-600 dark:text-amber-400',
     }
   }
 
   return {
-    badge:
-      'bg-primary/10 text-primary',
-    dot:
-      'bg-primary',
-    icon:
-      'bg-primary/10 text-primary',
+    badge: 'bg-primary/10 text-primary',
+    dot: 'bg-primary',
+    icon: 'bg-primary/10 text-primary',
   }
 }
 
@@ -139,26 +121,16 @@ function ChangeCell({
 }: {
   entry: ReturnHistoryEntry
 }) {
-  const [
-    expanded,
-    setExpanded,
-  ] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
-  const keys =
-    Array.from(
-      new Set([
-        ...Object.keys(
-          entry.old_data ?? {},
-        ),
-        ...Object.keys(
-          entry.new_data ?? {},
-        ),
-      ]),
-    )
+  const keys = Array.from(
+    new Set([
+      ...Object.keys(entry.old_data ?? {}),
+      ...Object.keys(entry.new_data ?? {}),
+    ]),
+  )
 
-  if (
-    keys.length === 0
-  ) {
+  if (keys.length === 0) {
     return (
       <span className="text-xs text-muted-foreground">
         Tidak ada perubahan detail
@@ -166,86 +138,59 @@ function ChangeCell({
     )
   }
 
-  const visibleKeys =
-    expanded
-      ? keys
-      : keys.slice(0, 2)
+  const visibleKeys = expanded
+    ? keys
+    : keys.slice(0, 2)
 
   return (
     <div className="space-y-2">
-      {visibleKeys.map(
-        (key) => {
-          const oldValue =
-            entry.old_data?.[
-              key
-            ]
+      {visibleKeys.map((key) => {
+        const oldValue = entry.old_data?.[key]
+        const newValue = entry.new_data?.[key]
 
-          const newValue =
-            entry.new_data?.[
-              key
-            ]
+        return (
+          <div
+            key={key}
+            className="rounded-lg border bg-background/70 p-2.5"
+          >
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {key.replace(/_/g, ' ')}
+            </p>
 
-          return (
-            <div
-              key={key}
-              className="rounded-lg border bg-background/70 p-2.5"
-            >
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {key.replace(
-                  /_/g,
-                  ' ',
-                )}
-              </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {entry.old_data && (
+                <span className="rounded-md bg-red-500/10 px-2 py-1 font-mono text-[11px] text-red-700 line-through dark:text-red-400">
+                  {renderValue(oldValue)}
+                </span>
+              )}
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                {entry.old_data && (
-                  <span className="rounded-md bg-red-500/10 px-2 py-1 font-mono text-[11px] text-red-700 line-through dark:text-red-400">
-                    {renderValue(
-                      oldValue,
-                    )}
-                  </span>
-                )}
+              {entry.old_data && entry.new_data && (
+                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+              )}
 
-                {entry.old_data &&
-                  entry.new_data && (
-                    <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-                  )}
-
-                {entry.new_data && (
-                  <span className="rounded-md bg-emerald-500/10 px-2 py-1 font-mono text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                    {renderValue(
-                      newValue,
-                    )}
-                  </span>
-                )}
-              </div>
+              {entry.new_data && (
+                <span className="rounded-md bg-emerald-500/10 px-2 py-1 font-mono text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                  {renderValue(newValue)}
+                </span>
+              )}
             </div>
-          )
-        },
-      )}
+          </div>
+        )
+      })}
 
       {keys.length > 2 && (
         <button
           type="button"
-          onClick={() =>
-            setExpanded(
-              (value) =>
-                !value,
-            )
-          }
+          onClick={() => setExpanded((value) => !value)}
           className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           {expanded
             ? 'Sembunyikan'
-            : `Lihat ${
-                keys.length - 2
-              } perubahan lainnya`}
+            : `Lihat ${keys.length - 2} perubahan lainnya`}
 
           <ChevronDown
             className={`size-3.5 transition-transform ${
-              expanded
-                ? 'rotate-180'
-                : ''
+              expanded ? 'rotate-180' : ''
             }`}
           />
         </button>
@@ -261,18 +206,36 @@ export function HistoryList({
   entries: ReturnHistoryEntry[]
   showReturn?: boolean
 }) {
-  return (
-    <div className="space-y-0">
-      {entries.map(
-        (entry, index) => {
-          const style =
-            getActionStyle(
-              entry.action,
-            )
+  const [page, setPage] = useState(1)
 
-          const isLast =
-            index ===
-            entries.length - 1
+  const totalPages = Math.max(
+    1,
+    Math.ceil(entries.length / HISTORY_PAGE_SIZE),
+  )
+
+  const currentPage = Math.min(page, totalPages)
+
+  const displayedEntries = entries.slice(
+    (currentPage - 1) * HISTORY_PAGE_SIZE,
+    currentPage * HISTORY_PAGE_SIZE,
+  )
+
+  const start =
+    entries.length === 0
+      ? 0
+      : (currentPage - 1) * HISTORY_PAGE_SIZE + 1
+
+  const end = Math.min(
+    currentPage * HISTORY_PAGE_SIZE,
+    entries.length,
+  )
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-0">
+        {displayedEntries.map((entry, index) => {
+          const style = getActionStyle(entry.action)
+          const isLast = index === displayedEntries.length - 1
 
           return (
             <div
@@ -315,15 +278,12 @@ export function HistoryList({
                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 className="size-3.5" />
-                          {formatDateTime(
-                            entry.created_at,
-                          )}
+                          {formatDateTime(entry.created_at)}
                         </span>
 
                         <span className="inline-flex items-center gap-1.5">
                           <UserRound className="size-3.5" />
-                          {entry.user_name ??
-                            'Sistem'}
+                          {entry.user_name ?? 'Sistem'}
                         </span>
                       </div>
                     </div>
@@ -344,8 +304,7 @@ export function HistoryList({
                               </p>
 
                               <p className="font-mono text-xs font-semibold text-primary">
-                                {entry.no_return ??
-                                  '-'}
+                                {entry.no_return ?? '-'}
                               </p>
                             </div>
 
@@ -370,9 +329,7 @@ export function HistoryList({
                       </span>
                     </div>
 
-                    <ChangeCell
-                      entry={entry}
-                    />
+                    <ChangeCell entry={entry} />
                   </div>
 
                   {/* Notes */}
@@ -395,7 +352,68 @@ export function HistoryList({
               </div>
             </div>
           )
-        },
+        })}
+      </div>
+
+      {/* Pagination */}
+      {entries.length > HISTORY_PAGE_SIZE && (
+        <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Menampilkan {formatNumber(start)}–{formatNumber(end)} dari{' '}
+            {formatNumber(entries.length)} riwayat
+          </p>
+
+          <nav
+            aria-label="Navigasi halaman riwayat"
+            className="flex flex-wrap items-center gap-1"
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setPage((p) => Math.max(1, p - 1))
+              }
+              disabled={currentPage === 1}
+              className="inline-flex h-9 items-center gap-1 rounded-md border px-3 text-sm disabled:pointer-events-none disabled:opacity-50"
+            >
+              <ChevronLeft className="size-4" />
+              Sebelumnya
+            </button>
+
+            {Array.from(
+              { length: totalPages },
+              (_, index) => index + 1,
+            ).map((number) => (
+              <button
+                key={number}
+                type="button"
+                onClick={() => setPage(number)}
+                aria-label={`Halaman ${number}`}
+                aria-current={
+                  currentPage === number ? 'page' : undefined
+                }
+                className={`h-9 min-w-9 rounded-md border px-3 text-sm ${
+                  currentPage === number
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'hover:bg-muted'
+                }`}
+              >
+                {number}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setPage((p) => Math.min(totalPages, p + 1))
+              }
+              disabled={currentPage === totalPages}
+              className="inline-flex h-9 items-center gap-1 rounded-md border px-3 text-sm disabled:pointer-events-none disabled:opacity-50"
+            >
+              Berikutnya
+              <ChevronRight className="size-4" />
+            </button>
+          </nav>
+        </div>
       )}
     </div>
   )

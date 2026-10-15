@@ -44,6 +44,7 @@ import type { AppUser } from '@/lib/types'
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: 'Dashboard Return',
+  ai: 'AI Insight',
   returns: 'Return Items',
   new: 'Penerimaan Baru',
   history: 'Return History',
@@ -66,6 +67,7 @@ function useCrumbs() {
 
 export function AppTopbar({ user }: { user: AppUser | null }) {
   const crumbs = useCrumbs()
+  const pathname = usePathname()
 
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -78,14 +80,21 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
     .slice(0, 2)
     .toUpperCase()
 
-  const isDashboard = usePathname() === '/dashboard'
+  const isDashboard = pathname === '/dashboard'
+  const isAIPage = pathname === '/ai'
+
+  const screenshotTargetId = isAIPage
+    ? 'ai-screenshot'
+    : 'dashboard-screenshot'
 
   async function handleScreenshot() {
-    const element = document.getElementById('dashboard-screenshot')
+    const element = document.getElementById(screenshotTargetId)
 
     if (!element) {
       alert(
-        'Area dashboard tidak ditemukan. Pastikan dashboard memiliki id "dashboard-screenshot".',
+        isAIPage
+          ? 'Area laporan AI tidak ditemukan. Pastikan halaman AI memiliki id "ai-screenshot".'
+          : 'Area dashboard tidak ditemukan. Pastikan dashboard memiliki id "dashboard-screenshot".',
       )
       return
     }
@@ -93,10 +102,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
     try {
       setScreenshotLoading(true)
 
-      /*
-       * Beri sedikit jeda supaya state loading
-       * sempat dirender sebelum screenshot dibuat.
-       */
+      // Beri jeda agar state loading sempat dirender.
       await new Promise((resolve) => setTimeout(resolve, 150))
 
       const dataUrl = await toPng(element, {
@@ -104,23 +110,30 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
         pixelRatio: 2,
         backgroundColor: '#ffffff',
         skipFonts: false,
+        filter: (node) =>
+          !(
+            node instanceof HTMLElement &&
+            node.hasAttribute('data-screenshot-ignore')
+          ),
       })
 
       const link = document.createElement('a')
 
-      const today = new Date()
-        .toLocaleDateString('sv-SE')
+      const today = new Date().toLocaleDateString('sv-SE')
 
-      link.download = `dashboard-return-${today}.png`
+      link.download = isAIPage
+        ? `report-monitoring-ai-${today}.png`
+        : `dashboard-return-${today}.png`
 
       link.href = dataUrl
-
       link.click()
     } catch (error) {
-      console.error('[Dashboard Screenshot]', error)
+      console.error('[Screenshot]', error)
 
       alert(
-        'Screenshot dashboard gagal dibuat. Silakan coba kembali.',
+        isAIPage
+          ? 'Screenshot laporan AI gagal dibuat. Silakan coba kembali.'
+          : 'Screenshot dashboard gagal dibuat. Silakan coba kembali.',
       )
     } finally {
       setScreenshotLoading(false)
@@ -140,9 +153,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
         sm:px-4
       "
     >
-      {/* =====================================================
-          LEFT SIDE
-          ===================================================== */}
+      {/* LEFT SIDE */}
 
       <SidebarTrigger
         className="
@@ -159,9 +170,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
         className="mx-1 h-5"
       />
 
-      {/* =====================================================
-          BREADCRUMB
-          ===================================================== */}
+      {/* BREADCRUMB */}
 
       <div className="min-w-0 flex-1">
         <Breadcrumb>
@@ -188,9 +197,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
                       </BreadcrumbPage>
                     ) : (
                       <BreadcrumbLink
-                        render={
-                          <Link href={crumb.href} />
-                        }
+                        render={<Link href={crumb.href} />}
                         className="text-muted-foreground transition-colors hover:text-foreground"
                       >
                         {crumb.label}
@@ -203,7 +210,8 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* Small system status */}
+        {/* SYSTEM STATUS */}
+
         <div className="mt-0.5 hidden items-center gap-1.5 lg:flex">
           <span className="relative flex size-1.5">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
@@ -216,23 +224,26 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
         </div>
       </div>
 
-      {/* =====================================================
-          RIGHT SIDE
-          ===================================================== */}
+      {/* RIGHT SIDE */}
 
       <div className="flex items-center gap-1.5">
+        {/* SCREENSHOT */}
 
-        {/* ===================================================
-            SCREENSHOT
-            =================================================== */}
-
-        {isDashboard && (
+        {(isDashboard || isAIPage) && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Screenshot dashboard"
-            title="Screenshot dashboard"
+            aria-label={
+              isAIPage
+                ? 'Screenshot laporan monitoring AI'
+                : 'Screenshot dashboard'
+            }
+            title={
+              isAIPage
+                ? 'Screenshot laporan monitoring AI'
+                : 'Screenshot dashboard'
+            }
             onClick={handleScreenshot}
             disabled={screenshotLoading}
             className="
@@ -282,7 +293,6 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
                   "
                 />
 
-                {/* Small accent */}
                 <span
                   className="
                     absolute
@@ -301,9 +311,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
           </Button>
         )}
 
-        {/* ===================================================
-            THEME
-            =================================================== */}
+        {/* THEME */}
 
         <Button
           type="button"
@@ -329,22 +337,17 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
           "
         >
           <Sun className="hidden size-4 dark:block" />
-
           <Moon className="size-4 dark:hidden" />
         </Button>
 
-        {/* ===================================================
-            SEPARATOR
-            =================================================== */}
+        {/* SEPARATOR */}
 
         <Separator
           orientation="vertical"
           className="mx-1 hidden h-7 sm:block"
         />
 
-        {/* ===================================================
-            ACCOUNT
-            =================================================== */}
+        {/* ACCOUNT */}
 
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -367,7 +370,8 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
             "
             aria-label="Menu akun"
           >
-            {/* Avatar */}
+            {/* AVATAR */}
+
             <span
               className="
                 relative
@@ -391,7 +395,6 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
             >
               {initials}
 
-              {/* Online indicator */}
               <span
                 className="
                   absolute
@@ -406,7 +409,8 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
               />
             </span>
 
-            {/* User information */}
+            {/* USER INFORMATION */}
+
             <span className="hidden min-w-0 flex-col items-start text-left leading-tight md:flex">
               <span className="max-w-[130px] truncate text-sm font-semibold text-foreground">
                 {user?.name ?? 'Mode Setup'}
@@ -419,7 +423,8 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
               </span>
             </span>
 
-            {/* Chevron */}
+            {/* CHEVRON */}
+
             <span
               className="
                 hidden
@@ -434,9 +439,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
             </span>
           </DropdownMenuTrigger>
 
-          {/* =================================================
-              ACCOUNT DROPDOWN
-              ================================================= */}
+          {/* ACCOUNT DROPDOWN */}
 
           <DropdownMenuContent
             align="end"
@@ -452,7 +455,6 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
             <DropdownMenuGroup>
               <DropdownMenuLabel className="p-3">
                 <div className="flex items-center gap-3">
-                  {/* Avatar large */}
                   <div
                     className="
                       flex
@@ -511,7 +513,6 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
                   "
                 >
                   <LogOut className="size-4" />
-
                   <span>Keluar dari sistem</span>
                 </DropdownMenuItem>
               </>

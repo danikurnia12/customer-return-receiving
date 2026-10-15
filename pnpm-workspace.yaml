@@ -6,4 +6,5 @@ minimumReleaseAgeExclude:
 
 allowBuilds:
   '@google/genai': true
+  core-js: false
   protobufjs: true

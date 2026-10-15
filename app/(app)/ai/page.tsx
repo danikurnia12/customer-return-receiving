@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState } from 'react'
@@ -15,8 +16,6 @@ import {
   Sparkles,
   TrendingUp,
   Activity,
-  CalendarDays,
-  ArrowUpRight,
 } from 'lucide-react'
 
 type AIResult = {
@@ -34,6 +33,27 @@ type AIResult = {
     totalQty: number
     totalItem: number
     totalSelisih: number
+  }[]
+  comparisons?: {
+    title: string
+    currentLabel: string
+    previousLabel: string
+    current: {
+      totalReturn: number
+      totalQty: number
+      totalItem: number
+      totalSelisih: number
+    }
+    previous: {
+      totalReturn: number
+      totalQty: number
+      totalItem: number
+      totalSelisih: number
+    }
+    change: Record<
+      'totalReturn' | 'totalQty' | 'totalItem' | 'totalSelisih',
+      { value: number; percent: number | null }
+    >
   }[]
 }
 
@@ -72,39 +92,26 @@ function ReturnTrendChart({
   const paddingTop = 35
   const paddingBottom = 60
 
-  const chartWidth =
-    width - paddingLeft - paddingRight
-
-  const chartHeight =
-    height - paddingTop - paddingBottom
+  const chartWidth = width - paddingLeft - paddingRight
+  const chartHeight = height - paddingTop - paddingBottom
 
   const maxReturn = Math.max(
     ...data.map((item) => item.totalReturn),
-    1
+    1,
   )
 
-  const yMax = Math.max(
-    Math.ceil(maxReturn / 5) * 5,
-    5
-  )
+  const yMax = Math.max(Math.ceil(maxReturn / 5) * 5, 5)
 
   const getX = (index: number) => {
     if (data.length === 1) {
       return paddingLeft + chartWidth / 2
     }
 
-    return (
-      paddingLeft +
-      (index / (data.length - 1)) * chartWidth
-    )
+    return paddingLeft + (index / (data.length - 1)) * chartWidth
   }
 
   const getY = (value: number) => {
-    return (
-      paddingTop +
-      chartHeight -
-      (value / yMax) * chartHeight
-    )
+    return paddingTop + chartHeight - (value / yMax) * chartHeight
   }
 
   const points = data.map((item, index) => ({
@@ -125,12 +132,8 @@ function ReturnTrendChart({
 
   const areaPath = `
     ${linePath}
-    L ${points[points.length - 1].x} ${
-      paddingTop + chartHeight
-    }
-    L ${points[0].x} ${
-      paddingTop + chartHeight
-    }
+    L ${points[points.length - 1].x} ${paddingTop + chartHeight}
+    L ${points[0].x} ${paddingTop + chartHeight}
     Z
   `
 
@@ -147,9 +150,7 @@ function ReturnTrendChart({
           </div>
 
           <div>
-            <h3 className="text-base font-semibold">
-              Tren Return
-            </h3>
+            <h3 className="text-base font-semibold">Tren Return</h3>
 
             <p className="text-xs text-muted-foreground">
               Perkembangan jumlah Return berdasarkan periode
@@ -184,27 +185,15 @@ function ReturnTrendChart({
                 x2="0"
                 y2="1"
               >
-                <stop
-                  offset="0%"
-                  stopOpacity="0.28"
-                />
-
-                <stop
-                  offset="100%"
-                  stopOpacity="0.02"
-                />
+                <stop offset="0%" stopOpacity="0.28" />
+                <stop offset="100%" stopOpacity="0.02" />
               </linearGradient>
             </defs>
 
             {/* GRID */}
 
-            {Array.from({
-              length: gridCount + 1,
-            }).map((_, index) => {
-              const value =
-                (yMax / gridCount) *
-                (gridCount - index)
-
+            {Array.from({ length: gridCount + 1 }).map((_, index) => {
+              const value = (yMax / gridCount) * (gridCount - index)
               const y = getY(value)
 
               return (
@@ -255,16 +244,12 @@ function ReturnTrendChart({
 
             {points.map((point, index) => (
               <g key={`${point.period}-${index}`}>
-                {/* Outer glow */}
-
                 <circle
                   cx={point.x}
                   cy={point.y}
                   r="9"
                   className="fill-primary/10"
                 />
-
-                {/* White border */}
 
                 <circle
                   cx={point.x}
@@ -274,15 +259,11 @@ function ReturnTrendChart({
                   strokeWidth="3"
                 />
 
-                {/* Tooltip */}
-
                 <title>
                   {`${point.period}: ${point.totalReturn} Return | ${point.totalQty.toLocaleString(
-                    'id-ID'
+                    'id-ID',
                   )} Qty | ${point.totalItem} Item`}
                 </title>
-
-                {/* Value */}
 
                 <text
                   x={point.x}
@@ -292,8 +273,6 @@ function ReturnTrendChart({
                 >
                   {point.totalReturn}
                 </text>
-
-                {/* Period */}
 
                 <text
                   x={point.x}
@@ -313,9 +292,7 @@ function ReturnTrendChart({
 
       <div className="grid grid-cols-2 border-t sm:grid-cols-3">
         <div className="border-r px-5 py-4">
-          <p className="text-xs text-muted-foreground">
-            Periode
-          </p>
+          <p className="text-xs text-muted-foreground">Periode</p>
 
           <p className="mt-1 text-sm font-semibold">
             {data.length} periode
@@ -323,32 +300,22 @@ function ReturnTrendChart({
         </div>
 
         <div className="border-r px-5 py-4">
-          <p className="text-xs text-muted-foreground">
-            Return Tertinggi
-          </p>
+          <p className="text-xs text-muted-foreground">Return Tertinggi</p>
 
           <p className="mt-1 text-sm font-semibold">
             {Math.max(
-              ...data.map(
-                (item) => item.totalReturn
-              )
+              ...data.map((item) => item.totalReturn),
             ).toLocaleString('id-ID')}{' '}
             Return
           </p>
         </div>
 
         <div className="col-span-2 px-5 py-4 sm:col-span-1">
-          <p className="text-xs text-muted-foreground">
-            Total Qty
-          </p>
+          <p className="text-xs text-muted-foreground">Total Qty</p>
 
           <p className="mt-1 text-sm font-semibold">
             {data
-              .reduce(
-                (sum, item) =>
-                  sum + item.totalQty,
-                0
-              )
+              .reduce((sum, item) => sum + item.totalQty, 0)
               .toLocaleString('id-ID')}
           </p>
         </div>
@@ -357,43 +324,39 @@ function ReturnTrendChart({
   )
 }
 
+/* =========================================================
+   AI INSIGHT PAGE
+   ========================================================= */
+
 export default function AIPage() {
   const [loading, setLoading] = useState(false)
-
-  const [result, setResult] =
-    useState<AIResult | null>(null)
+  const [result, setResult] = useState<AIResult | null>(null)
 
   async function handleAnalyze() {
     try {
       setLoading(true)
       setResult(null)
 
-      const response =
-        await getReturnAIInsight()
+      const response = await getReturnAIInsight()
 
       setResult(response)
     } catch (error) {
-      console.error(
-        '[AI Page] Error:',
-        error
-      )
+      console.error('[AI Page] Error:', error)
 
       setResult({
         success: false,
-
         message:
           error instanceof Error
             ? error.message
             : 'Terjadi kesalahan saat menjalankan analisis AI.',
-
         kpi: {
           totalReturn: 0,
           totalQty: 0,
           totalItem: 0,
           totalSelisih: 0,
         },
-
         trend: [],
+        comparisons: [],
       })
     } finally {
       setLoading(false)
@@ -401,11 +364,10 @@ export default function AIPage() {
   }
 
   const kpi = result?.kpi
-
   const trend = result?.trend ?? []
 
   return (
-    <div className="space-y-6">
+    <div id="ai-screenshot" className="space-y-6">
       {/* =====================================================
           HEADER
       ====================================================== */}
@@ -422,15 +384,24 @@ export default function AIPage() {
             </h1>
 
             <p className="text-sm text-muted-foreground">
-              Analisis cerdas berdasarkan data Customer Return Receiving.
+              Analisis monitoring berdasarkan data Customer Return Receiving.
             </p>
+            <p className="text-xs text-muted-foreground">
+  Laporan monitoring •{' '}
+  {new Date().toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })}
+</p>
           </div>
         </div>
 
         <button
-          type="button"
-          onClick={handleAnalyze}
-          disabled={loading}
+  type="button"
+  data-screenshot-ignore
+  onClick={handleAnalyze}
+  disabled={loading}
           className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? (
@@ -475,13 +446,13 @@ export default function AIPage() {
                 }`}
               >
                 {result.success
-                  ? 'AI berhasil menganalisis data'
-                  : 'AI gagal menganalisis data'}
+                  ? 'Analisis monitoring berhasil'
+                  : 'Analisis monitoring gagal'}
               </p>
 
               <p className="text-xs text-muted-foreground">
                 {result.success
-                  ? 'KPI, tren, dan insight dibuat berdasarkan data Return yang tersedia.'
+                  ? 'Ringkasan monitoring, tren, dan analisis dibuat berdasarkan data Return yang tersedia.'
                   : 'Periksa koneksi atau konfigurasi AI kemudian coba lagi.'}
               </p>
             </div>
@@ -490,18 +461,18 @@ export default function AIPage() {
       )}
 
       {/* =====================================================
-          KPI AI
+          RINGKASAN MONITORING
       ====================================================== */}
 
       {result?.success && kpi && (
         <div>
           <div className="mb-3">
             <h2 className="text-lg font-semibold">
-              KPI Return
+              Ringkasan Monitoring Return
             </h2>
 
             <p className="text-sm text-muted-foreground">
-              Ringkasan data Return yang dianalisis oleh AI.
+              Ringkasan kondisi data Return aktif yang tercatat di sistem.
             </p>
           </div>
 
@@ -516,9 +487,7 @@ export default function AIPage() {
                   </p>
 
                   <p className="mt-2 text-3xl font-bold tracking-tight">
-                    {kpi.totalReturn.toLocaleString(
-                      'id-ID'
-                    )}
+                    {kpi.totalReturn.toLocaleString('id-ID')}
                   </p>
                 </div>
 
@@ -528,7 +497,7 @@ export default function AIPage() {
               </div>
 
               <p className="mt-3 text-xs text-muted-foreground">
-                Return aktif yang dianalisis
+                Return aktif yang tercatat
               </p>
             </div>
 
@@ -538,13 +507,11 @@ export default function AIPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
-                    Total Qty
+                    Total Qty Aktual
                   </p>
 
                   <p className="mt-2 text-3xl font-bold tracking-tight">
-                    {kpi.totalQty.toLocaleString(
-                      'id-ID'
-                    )}
+                    {kpi.totalQty.toLocaleString('id-ID')}
                   </p>
                 </div>
 
@@ -554,7 +521,7 @@ export default function AIPage() {
               </div>
 
               <p className="mt-3 text-xs text-muted-foreground">
-                Quantity aktual Return
+                Jumlah aktual material Return
               </p>
             </div>
 
@@ -568,9 +535,7 @@ export default function AIPage() {
                   </p>
 
                   <p className="mt-2 text-3xl font-bold tracking-tight">
-                    {kpi.totalItem.toLocaleString(
-                      'id-ID'
-                    )}
+                    {kpi.totalItem.toLocaleString('id-ID')}
                   </p>
                 </div>
 
@@ -590,13 +555,11 @@ export default function AIPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
-                    Selisih
+                    Return Berselisih
                   </p>
 
                   <p className="mt-2 text-3xl font-bold tracking-tight">
-                    {kpi.totalSelisih.toLocaleString(
-                      'id-ID'
-                    )}
+                    {kpi.totalSelisih.toLocaleString('id-ID')}
                   </p>
                 </div>
 
@@ -620,12 +583,168 @@ export default function AIPage() {
       )}
 
       {/* =====================================================
+          PERBANDINGAN BULANAN DAN MINGGUAN
+      ====================================================== */}
+
+      {result?.success && result.comparisons && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">
+              Perbandingan Periode
+            </h2>
+
+            <p className="text-sm text-muted-foreground">
+              Perbandingan data periode berjalan dengan periode sebelumnya
+              menggunakan rentang hari yang sebanding.
+            </p>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            {result.comparisons.map((comparison) => {
+              const metrics = [
+                {
+                  key: 'totalReturn' as const,
+                  label: 'Total Return',
+                },
+                {
+                  key: 'totalQty' as const,
+                  label: 'Qty Aktual',
+                },
+                {
+                  key: 'totalItem' as const,
+                  label: 'Total Item',
+                },
+                {
+                  key: 'totalSelisih' as const,
+                  label: 'Return Berselisih',
+                },
+              ]
+
+              const formatNumber = (value: number) =>
+                value.toLocaleString('id-ID')
+
+              return (
+                <div
+                  key={comparison.title}
+                  className="rounded-xl border bg-card p-5 shadow-sm"
+                >
+                  <h3 className="font-semibold">
+                    {comparison.title}
+                  </h3>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg bg-muted/40 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Periode berjalan
+                      </p>
+
+                      <p className="mt-1 text-sm font-medium">
+                        {comparison.currentLabel}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-muted/40 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Periode sebelumnya
+                      </p>
+
+                      <p className="mt-1 text-sm font-medium">
+                        {comparison.previousLabel}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="py-2 pr-2 font-medium">
+                            Data Monitoring
+                          </th>
+
+                          <th className="px-2 py-2 text-right font-medium">
+                            Sekarang
+                          </th>
+
+                          <th className="px-2 py-2 text-right font-medium">
+                            Sebelumnya
+                          </th>
+
+                          <th className="py-2 pl-2 text-right font-medium">
+                            Perubahan
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {metrics.map((metric) => {
+                          const current =
+                            comparison.current[metric.key]
+
+                          const previous =
+                            comparison.previous[metric.key]
+
+                          const change =
+                            comparison.change[metric.key]
+
+                          return (
+                            <tr
+                              key={metric.key}
+                              className="border-b last:border-0"
+                            >
+                              <td className="py-3 pr-2">
+                                {metric.label}
+                              </td>
+
+                              <td className="px-2 py-3 text-right tabular-nums">
+                                {formatNumber(current)}
+                              </td>
+
+                              <td className="px-2 py-3 text-right tabular-nums">
+                                {formatNumber(previous)}
+                              </td>
+
+                              <td className="py-3 pl-2 text-right">
+                                <div className="font-medium tabular-nums">
+                                  {change.value > 0 ? '+' : ''}
+                                  {formatNumber(change.value)}
+                                </div>
+
+                                <div className="text-xs text-muted-foreground">
+                                  {change.percent === null
+                                    ? 'Persentase —'
+                                    : `${change.percent > 0 ? '+' : ''}${change.percent.toLocaleString(
+                                        'id-ID',
+                                        {
+                                          maximumFractionDigits: 1,
+                                        },
+                                      )}%`}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <p className="text-xs leading-5 text-muted-foreground">
+            Catatan: minggu dimulai pada hari Senin. Perbandingan menggunakan
+            rentang hari yang sebanding. Periode berjalan mungkin belum lengkap.
+            Persentase tidak ditampilkan jika nilai periode sebelumnya nol.
+          </p>
+        </section>
+      )}
+
+      {/* =====================================================
           TREND CHART
       ====================================================== */}
 
-      {result?.success && (
-        <ReturnTrendChart data={trend} />
-      )}
+      {result?.success && <ReturnTrendChart data={trend} />}
 
       {/* =====================================================
           EMPTY STATE
@@ -643,11 +762,9 @@ export default function AIPage() {
             </h2>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-              Klik tombol{' '}
-              <strong>Analisis Data</strong>{' '}
-              untuk meminta AI membaca dan
-              menganalisis data Return yang
-              tersimpan di sistem.
+              Klik tombol <strong>Analisis Data</strong> untuk menyiapkan
+              ringkasan monitoring dan meminta Gemini menganalisis ringkasan
+              tersebut.
             </p>
 
             <p className="mt-3 text-xs text-muted-foreground">
@@ -669,14 +786,13 @@ export default function AIPage() {
             </div>
 
             <h2 className="text-xl font-semibold">
-              AI sedang menganalisis...
+              Menyiapkan analisis monitoring...
             </h2>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-              Sistem sedang mengambil data Return
-              dan meminta Gemini membuat analisis.
-              Proses ini dapat membutuhkan beberapa
-              saat.
+              Aplikasi sedang menyiapkan ringkasan data Return dan meminta
+              Gemini menganalisis ringkasan tersebut. Proses ini dapat
+              membutuhkan beberapa saat.
             </p>
           </div>
         </div>
@@ -697,12 +813,11 @@ export default function AIPage() {
 
                 <div>
                   <h2 className="text-lg font-semibold">
-                    Return Intelligence
+                    Analisis Monitoring Return
                   </h2>
 
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Ringkasan analisis otomatis terhadap
-                    data Return.
+                    Ringkasan analisis berdasarkan data Return.
                   </p>
                 </div>
               </div>
@@ -736,15 +851,13 @@ export default function AIPage() {
               <Database className="size-5" />
             </div>
 
-            <p className="text-sm font-semibold">
-              Data Source
-            </p>
+            <p className="text-sm font-semibold">Data Source</p>
           </div>
 
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Data Return Receiving yang tersimpan
-            di sistem digunakan sebagai sumber
-            analisis.
+            Data Return aktif digunakan untuk menyajikan ringkasan monitoring,
+            perbandingan periode, dan tren. Return yang dibatalkan dikecualikan
+            dari analisis.
           </p>
         </div>
 
@@ -756,15 +869,13 @@ export default function AIPage() {
               <ShieldCheck className="size-5" />
             </div>
 
-            <p className="text-sm font-semibold">
-              AI Role
-            </p>
+            <p className="text-sm font-semibold">AI Role</p>
           </div>
 
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            AI hanya membaca dan menganalisis
-            data. AI tidak melakukan INSERT, UPDATE,
-            atau DELETE terhadap data Return.
+            Aplikasi menghitung dan menyiapkan ringkasan data Return. Gemini
+            hanya menganalisis ringkasan tersebut tanpa akses langsung ke
+            database dan tidak mengubah data Return.
           </p>
         </div>
 
@@ -776,15 +887,12 @@ export default function AIPage() {
               <BarChart3 className="size-5" />
             </div>
 
-            <p className="text-sm font-semibold">
-              Analysis
-            </p>
+            <p className="text-sm font-semibold">Analysis</p>
           </div>
 
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Insight dan tren dibuat berdasarkan
-            data yang tersedia pada saat analisis
-            dijalankan.
+            Insight dan tren dibuat berdasarkan ringkasan data yang tersedia
+            pada saat analisis dijalankan.
           </p>
         </div>
       </div>

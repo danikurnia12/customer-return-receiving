@@ -18,7 +18,12 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { createReturnAction } from '@/app/actions/returns'
+
+import {
+  createReturnAction,
+  cleanupUnattachedReturnPhotosAction,
+} from '@/app/actions/returns'
+
 import { EmptyState } from '@/components/app/states'
 import {
   EMPTY_ITEM,
@@ -286,18 +291,44 @@ export function ReturnForm({
       toast.error(
         'Periksa kembali data yang wajib diisi.',
       )
-
       return
     }
-
     setConfirmOpen(true)
   }
-
   /*
    * ============================================================
    * SUBMIT
    * ============================================================
    */
+  const cancelForm = async () => {
+    if (saving) return
+    const paths = [
+      header.foto_surat_jalan_url,
+      header.foto_material_url,].filter((path): path is string => Boolean(path))
+    setSaving(true)
+
+    try {
+      if (paths.length > 0) {
+        const result =
+          await cleanupUnattachedReturnPhotosAction(paths)
+
+        if (!result.success) {
+          toast.error(
+            result.error ||
+              'Foto sementara belum berhasil dibersihkan.',
+          )
+          return
+        }
+      }
+
+      router.push('/returns')
+    } catch (error) {
+      console.error('[ReturnForm] Cancel error:', error)
+      toast.error('Gagal membatalkan form. Silakan coba kembali.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const submit = async () => {
     if (saving) return
@@ -916,11 +947,7 @@ export function ReturnForm({
               type="button"
               variant="outline"
               className="hidden md:inline-flex"
-              onClick={() =>
-                router.push(
-                  '/returns',
-                )
-              }
+              onClick={cancelForm}
               disabled={saving}
             >
               Batal
@@ -928,13 +955,8 @@ export function ReturnForm({
 
             <Button
               type="button"
-              onClick={
-                openConfirm
-              }
-              disabled={
-                saving ||
-                items.length === 0
-              }
+              onClick={openConfirm}
+              disabled={saving ||items.length === 0}
               className="h-10 flex-1 gap-2 px-5 shadow-sm sm:flex-none"
             >
               {saving ? (

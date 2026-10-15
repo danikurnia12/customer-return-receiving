@@ -416,6 +416,164 @@ export async function createReturnAction(
   }
 }
 
+
+export async function cleanupUnattachedReturnPhotosAction(
+  paths: string[],
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return {
+      success: false,
+      error: 'Supabase belum terhubung.',
+    }
+  }
+
+  const auth = await authorize(canCreateReturn)
+
+  if ('error' in auth) {
+    return {
+      success: false,
+      error: auth.error,
+    }
+  }
+
+  const uniquePaths = [
+    ...new Set(
+      paths
+        .filter((path): path is string => typeof path === 'string')
+        .map((path) => path.trim()),
+    ),
+  ]
+
+  if (uniquePaths.length > 2) {
+    return {
+      success: false,
+      error: 'Jumlah foto tidak valid.',
+    }
+  }
+
+  const validPhotoPath =
+    /^\d{4}\/\d{2}\/(?:material|surat-jalan)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:jpg|png|webp)$/i
+
+  if (uniquePaths.some((path) => !validPhotoPath.test(path))) {
+    return {
+      success: false,
+      error: 'Path foto tidak valid.',
+    }
+  }
+
+  if (uniquePaths.length === 0) {
+    return { success: true }
+  }
+
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.SUPABASE_URL
+
+  const secretKey =
+    process.env.SUPABASE_SECRET_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !secretKey) {
+    return {
+      success: false,
+      error: 'Konfigurasi server Supabase belum tersedia.',
+    }
+  }
+
+  try {
+    const admin = createSupabaseAdminClient(
+      supabaseUrl,
+      secretKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      },
+    )
+
+    const unusedPaths: string[] = []
+
+    for (const path of uniquePaths) {
+      const { data: suratJalan, error: suratError } =
+        await admin
+          .from('return_headers')
+          .select('id')
+          .eq('foto_surat_jalan_url', path)
+          .limit(1)
+          .maybeSingle()
+
+      if (suratError) {
+        console.error(
+          '[cleanupUnattachedReturnPhotosAction]',
+          suratError.message,
+        )
+
+        return {
+          success: false,
+          error: 'Foto belum dapat diperiksa dengan aman.',
+        }
+      }
+
+      const { data: material, error: materialError } =
+        await admin
+          .from('return_headers')
+          .select('id')
+          .eq('foto_material_url', path)
+          .limit(1)
+          .maybeSingle()
+
+      if (materialError) {
+        console.error(
+          '[cleanupUnattachedReturnPhotosAction]',
+          materialError.message,
+        )
+
+        return {
+          success: false,
+          error: 'Foto belum dapat diperiksa dengan aman.',
+        }
+      }
+
+      // Foto yang masih digunakan Return tidak boleh dihapus.
+      if (!suratJalan && !material) {
+        unusedPaths.push(path)
+      }
+    }
+
+    if (unusedPaths.length > 0) {
+      const { error: storageError } = await admin.storage
+        .from('return-photos')
+        .remove(unusedPaths)
+
+      if (storageError) {
+        console.error(
+          '[cleanupUnattachedReturnPhotosAction] Storage:',
+          storageError.message,
+        )
+
+        return {
+          success: false,
+          error: 'Gagal membersihkan foto sementara.',
+        }
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error(
+      '[cleanupUnattachedReturnPhotosAction]',
+      error,
+    )
+
+    return {
+      success: false,
+      error: 'Pembersihan foto gagal diproses.',
+    }
+  }
+}
+
+
 /* ============================================================
    UPDATE RETURN HEADER
    ============================================================ */
@@ -425,11 +583,13 @@ export async function updateReturnHeaderAction(
   input: ReturnHeaderInput,
   notes?: string,
 ): Promise<ActionResult> {
+  const normalizedReturnId = String(returnId).trim()
+
   if (!isSupabaseConfigured) {
     return NOT_CONFIGURED
   }
 
-  if (!validId(returnId)) {
+  if (!validId(normalizedReturnId)) {
     return {
       ok: false,
       error: 'ID return tidak valid.',
@@ -470,7 +630,7 @@ export async function updateReturnHeaderAction(
     } = await supabase
       .from('return_headers')
       .select('*')
-      .eq('id', returnId)
+      .eq('id', normalizedReturnId)
       .maybeSingle()
 
     if (oldError) {
@@ -528,7 +688,7 @@ export async function updateReturnHeaderAction(
     } = await supabase
       .from('return_headers')
       .update(next)
-      .eq('id', returnId)
+      .eq('id', normalizedReturnId)
 
     if (updateError) {
       console.error(
@@ -546,7 +706,8 @@ export async function updateReturnHeaderAction(
 
     const historyError =
       await insertHistory(supabase, {
-        return_header_id: Number(returnId),
+        return_header_id:
+          Number(normalizedReturnId),
         user_id: auth.user.id,
         action: 'UPDATE_HEADER',
         module: 'RETURN',
@@ -603,11 +764,13 @@ export async function addReturnItemAction(
   returnId: string,
   input: ReturnItemInput,
 ): Promise<ActionResult> {
+  const normalizedReturnId = String(returnId).trim()
+
   if (!isSupabaseConfigured) {
     return NOT_CONFIGURED
   }
 
-  if (!validId(returnId)) {
+  if (!validId(normalizedReturnId)) {
     return {
       ok: false,
       error: 'ID return tidak valid.',
@@ -646,8 +809,8 @@ export async function addReturnItemAction(
       error: parentError,
     } = await supabase
       .from('return_headers')
-      .select('id,status')
-      .eq('id', returnId)
+      .select('id,status,no_return')
+      .eq('id', normalizedReturnId)
       .maybeSingle()
 
     if (parentError) {
@@ -669,6 +832,14 @@ export async function addReturnItemAction(
       }
     }
 
+    const noReturn = (
+      parent as {
+        id: number
+        status: string
+        no_return: string
+      }
+    ).no_return
+
     if (parent.status === 'dibatalkan') {
       return {
         ok: false,
@@ -686,7 +857,9 @@ export async function addReturnItemAction(
       .from('return_items')
       .insert({
         ...row,
-        return_header_id: Number(returnId),
+        no_return: noReturn,
+        return_header_id:
+          Number(normalizedReturnId),
       })
       .select('*')
       .single()
@@ -707,7 +880,8 @@ export async function addReturnItemAction(
 
     const historyError =
       await insertHistory(supabase, {
-        return_header_id: Number(returnId),
+        return_header_id:
+          Number(normalizedReturnId),
         user_id: auth.user.id,
         action: 'ADD_ITEM',
         module: 'ITEM',
@@ -752,11 +926,13 @@ export async function updateReturnItemAction(
   input: ReturnItemInput,
   notes?: string,
 ): Promise<ActionResult> {
+  const normalizedItemId = String(itemId).trim()
+
   if (!isSupabaseConfigured) {
     return NOT_CONFIGURED
   }
 
-  if (!validId(itemId)) {
+  if (!validId(normalizedItemId)) {
     return {
       ok: false,
       error: 'ID item tidak valid.',
@@ -796,7 +972,7 @@ export async function updateReturnItemAction(
     } = await supabase
       .from('return_items')
       .select('*')
-      .eq('id', itemId)
+      .eq('id', normalizedItemId)
       .maybeSingle()
 
     if (oldError) {
@@ -875,7 +1051,7 @@ export async function updateReturnItemAction(
     } = await supabase
       .from('return_items')
       .update(next)
-      .eq('id', itemId)
+      .eq('id', normalizedItemId)
 
     if (updateError) {
       console.error(

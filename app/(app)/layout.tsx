@@ -11,9 +11,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         <AppTopbar user={user} />
-        <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <main className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden p-4 md:p-6">
           {user && user.status !== 'active' && (
             <div
               role="alert"

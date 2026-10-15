@@ -503,18 +503,21 @@ export function ItemDialog({
                   Lokasi / SLOC
                 </Label>
 
-                <Input
-                  id="item-sloc"
-                  value={draft.sloc}
-                  onChange={(event) =>
-                    setField(
-                      'sloc',
-                      event.target.value,
-                    )
-                  }
-                  placeholder="Contoh: 1310"
-                  maxLength={30}
-                />
+                <Select
+    value={draft.sloc}
+    onValueChange={(value) =>
+      setField('sloc', value ?? '')
+    }
+  >
+    <SelectTrigger id="item-sloc">
+      <SelectValue placeholder="Pilih Lokasi / SLOC" />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="5N12">5N12</SelectItem>
+      <SelectItem value="5B02">5B02</SelectItem>
+    </SelectContent>
+  </Select>
 
                 {errors.sloc && (
                   <p className="text-xs text-destructive">

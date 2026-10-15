@@ -180,7 +180,7 @@ export default async function ReturnsPage({
             </div>
 
             <div className="overflow-x-auto">
-              <ReturnsTable rows={rows} />
+              <ReturnsTable rows={rows} pagination />
             </div>
           </section>
         )}

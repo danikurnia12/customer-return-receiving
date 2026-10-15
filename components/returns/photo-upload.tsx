@@ -5,7 +5,12 @@ import { ImagePlus, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { uploadReturnPhoto, validatePhoto, type PhotoKind } from '@/lib/storage'
+import {
+  uploadReturnPhoto,
+  deleteReturnPhoto,
+  validatePhoto,
+  type PhotoKind,
+} from '@/lib/storage'
 
 export function PhotoUpload({
   label,
@@ -23,6 +28,7 @@ export function PhotoUpload({
   const id = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return
@@ -43,6 +49,30 @@ export function PhotoUpload({
       if (inputRef.current) inputRef.current.value = ''
     }
   }
+  const handleRemove = async () => {
+  if (!path || uploading || deleting) return
+
+  setDeleting(true)
+
+  try {
+    await deleteReturnPhoto(path)
+
+    if (preview?.startsWith('blob:')) {
+      URL.revokeObjectURL(preview)
+    }
+
+    onChange(null, null)
+    toast.success(`${label} berhasil dihapus`)
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : `Gagal menghapus ${label.toLowerCase()}`,
+    )
+  } finally {
+    setDeleting(false)
+  }
+}
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -66,9 +96,14 @@ export function PhotoUpload({
             variant="secondary"
             className="absolute top-2 right-2"
             aria-label={`Hapus ${label}`}
-            onClick={() => onChange(null, null)}
+           onClick={handleRemove}
+disabled={uploading || deleting}
           >
-            <X />
+            {deleting ? (
+  <Loader2 className="size-4 animate-spin" />
+) : (
+  <X />
+)}
           </Button>
         </div>
       ) : (

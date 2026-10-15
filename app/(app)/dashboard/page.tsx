@@ -348,15 +348,13 @@ export default async function DashboardPage({
 
   <div className="p-4 sm:p-5">
     <ReturnChart
-      data={dashboardData.chart}
-      mode={dashboardData.chartMode}
-      statusData={
-        dashboardData.statusChart
-      }
-      customerData={
-        dashboardData.customerChart
-      }
-    />
+  data={dashboardData.chart}
+  mode={dashboardData.chartMode}
+  statusData={dashboardData.statusChart}
+  customerData={dashboardData.customerChart}
+  locationData={dashboardData.locationChart}
+  locationSeries={dashboardData.locationSeries}
+/>
   </div>
 </section>
 

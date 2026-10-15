@@ -26,3 +26,28 @@ export async function uploadReturnPhoto(file: File, kind: PhotoKind) {
   if (error) throw new Error(`Gagal upload foto: ${error.message}`)
   return path
 }
+
+/**
+ * Menghapus foto yang diunggah dari form Return baru.
+ */
+export async function deleteReturnPhoto(path: string) {
+  const safePath = path.trim()
+
+  if (
+    !safePath ||
+    safePath.startsWith('/') ||
+    safePath.split('/').includes('..')
+  ) {
+    throw new Error('Path foto tidak valid.')
+  }
+
+  const supabase = createClient()
+
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .remove([safePath])
+
+  if (error) {
+    throw new Error(`Gagal menghapus foto: ${error.message}`)
+  }
+}
