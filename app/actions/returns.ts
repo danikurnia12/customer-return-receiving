@@ -10,6 +10,7 @@ import {
 } from '@/lib/permissions'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
 import { createClient } from '@/lib/supabase/server'
+import { getReturnItemsByHeader } from '@/lib/services/returns'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 
 import type { ActionResult } from '@/lib/types'
@@ -1123,22 +1124,25 @@ export async function updateReturnItemAction(
    ============================================================ */
 
 export async function deleteReturnItemAction(
-  itemId: string,
+  itemId: string | number,
 ): Promise<ActionResult> {
   if (!isSupabaseConfigured) {
     return NOT_CONFIGURED
   }
 
-  if (!validId(itemId)) {
+  // Normalisasi ID karena bigint dari database
+  // dapat diterima JavaScript sebagai number.
+  const normalizedItemId = String(itemId ?? '').trim()
+
+  if (!/^[1-9]\d*$/.test(normalizedItemId)) {
     return {
       ok: false,
       error: 'ID item tidak valid.',
     }
   }
 
-  const auth = await authorize(
-    canEditReturn,
-  )
+  // Hanya Master Data yang boleh menghapus item.
+  const auth = await authorize(canDeleteReturn)
 
   if ('error' in auth) {
     return {
@@ -1148,8 +1152,7 @@ export async function deleteReturnItemAction(
   }
 
   try {
-    const supabase =
-      await createClient()
+    const supabase = await createClient()
 
     const {
       data: old,
@@ -1157,7 +1160,7 @@ export async function deleteReturnItemAction(
     } = await supabase
       .from('return_items')
       .select('*')
-      .eq('id', itemId)
+      .eq('id', normalizedItemId)
       .maybeSingle()
 
     if (oldError) {
@@ -1203,8 +1206,7 @@ export async function deleteReturnItemAction(
     if (!parent) {
       return {
         ok: false,
-        error:
-          'Data return induk tidak ditemukan.',
+        error: 'Data return induk tidak ditemukan.',
       }
     }
 
@@ -1216,6 +1218,7 @@ export async function deleteReturnItemAction(
       }
     }
 
+    // Pastikan Return masih memiliki lebih dari satu item.
     const {
       count,
       error: countError,
@@ -1225,10 +1228,7 @@ export async function deleteReturnItemAction(
         count: 'exact',
         head: true,
       })
-      .eq(
-        'return_header_id',
-        old.return_header_id,
-      )
+      .eq('return_header_id', old.return_header_id)
 
     if (countError) {
       console.error(
@@ -1250,12 +1250,16 @@ export async function deleteReturnItemAction(
       }
     }
 
+    // Hapus dan minta ID hasil penghapusan sebagai konfirmasi.
     const {
+      data: deleted,
       error: deleteError,
     } = await supabase
       .from('return_items')
       .delete()
-      .eq('id', itemId)
+      .eq('id', normalizedItemId)
+      .select('id')
+      .maybeSingle()
 
     if (deleteError) {
       console.error(
@@ -1265,24 +1269,30 @@ export async function deleteReturnItemAction(
 
       return {
         ok: false,
-        error: friendlyDbError(
-          deleteError.message,
-        ),
+        error: friendlyDbError(deleteError.message),
       }
     }
 
-    const historyError =
-      await insertHistory(supabase, {
-        return_header_id:
-          old.return_header_id,
-        user_id: auth.user.id,
-        action: 'DELETE_ITEM',
-        module: 'ITEM',
-        old_data: old,
-        new_data: null,
-        changed_fields: null,
-        notes: 'Item return dihapus',
-      })
+    // Jangan laporkan berhasil jika tidak ada baris yang terhapus.
+    if (!deleted) {
+      return {
+        ok: false,
+        error:
+          'Item tidak berhasil dihapus. Periksa kembali akses dan data item.',
+      }
+    }
+
+    // Catat History setelah penghapusan terkonfirmasi.
+    const historyError = await insertHistory(supabase, {
+      return_header_id: old.return_header_id,
+      user_id: auth.user.id,
+      action: 'DELETE_ITEM',
+      module: 'ITEM',
+      old_data: old,
+      new_data: null,
+      changed_fields: null,
+      notes: 'Item return dihapus',
+    })
 
     if (historyError) {
       console.error(
@@ -1786,4 +1796,50 @@ function buildChangedFields(
 
     return result
   }, {})
+}
+
+/* ============================================================
+   LOAD RETURN ITEMS FOR MASTER-DETAIL VIEW
+   ============================================================ */
+
+/**
+ * Mengambil detail Item hanya untuk Header Return yang dipilih.
+ * Action ini hanya untuk kebutuhan tampilan; tidak mengubah data.
+ * Authentication dan RLS Supabase tetap berlaku.
+ */
+export async function loadReturnItemsForViewAction(
+  headerId: string,
+) {
+  if (!isSupabaseConfigured) {
+    throw new Error(
+      'Supabase belum terhubung. Silakan hubungkan kembali konfigurasi Supabase.',
+    )
+  }
+
+  const normalizedHeaderId = String(headerId ?? '').trim()
+
+  if (!/^\d+$/.test(normalizedHeaderId)) {
+    throw new Error('ID Return tidak valid.')
+  }
+
+  const user = await getCurrentUser()
+
+  if (!user) {
+    throw new Error(
+      'Sesi berakhir. Silakan login kembali.',
+    )
+  }
+
+  try {
+    return await getReturnItemsByHeader(normalizedHeaderId)
+  } catch (error) {
+    console.error(
+      '[loadReturnItemsForViewAction]',
+      error,
+    )
+
+    throw new Error(
+      'Detail material belum dapat dimuat. Silakan coba kembali.',
+    )
+  }
 }

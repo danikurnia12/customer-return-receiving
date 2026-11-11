@@ -28,43 +28,11 @@ import {
   returnItemSchema,
 } from '@/lib/validation'
 
-export interface ItemDraft {
-  diameter: string
-  tebal: string
-  panjang: string
-  batch: string
-  no_box: string
-  qty_surat_jalan: string
-  qty_aktual_diterima: string
-  kondisi_material: string
-  sloc: string
-}
+import type { ItemDraft } from '@/lib/return-item-draft'
 
-export const EMPTY_ITEM: ItemDraft = {
-  diameter: '',
-  tebal: '',
-  panjang: '',
-  batch: '',
-  no_box: '',
-  qty_surat_jalan: '',
-  qty_aktual_diterima: '',
-  kondisi_material: '',
-  sloc: '',
-}
-
-export function draftToInput(d: ItemDraft) {
-  return {
-    diameter: d.diameter,
-    tebal: d.tebal,
-    panjang: d.panjang,
-    batch: d.batch,
-    no_box: d.no_box,
-    qty_surat_jalan: d.qty_surat_jalan,
-    qty_aktual_diterima: d.qty_aktual_diterima,
-    kondisi_material: d.kondisi_material,
-    sloc: d.sloc,
-  }
-}
+// Re-export agar import lama dari item-dialog tetap kompatibel.
+export { EMPTY_ITEM, draftToInput } from '@/lib/return-item-draft'
+export type { ItemDraft } from '@/lib/return-item-draft'
 
 interface ItemDialogProps {
   open: boolean
@@ -81,23 +49,16 @@ export function ItemDialog({
   title,
   onSave,
 }: ItemDialogProps) {
-  const [draft, setDraft] =
-    useState<ItemDraft>(initial)
-
-  const [errors, setErrors] =
-    useState<Record<string, string>>({})
-
-  const [saving, setSaving] =
-    useState(false)
+  const [draft, setDraft] = useState<ItemDraft>(initial)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
 
   const resetFromInitial = () => {
     setDraft(initial)
     setErrors({})
   }
 
-  const handleOpenChange = (
-    nextOpen: boolean,
-  ) => {
+  const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       resetFromInitial()
     }
@@ -125,14 +86,10 @@ export function ItemDialog({
   const handleSave = async () => {
     if (saving) return
 
-    const parsed =
-      returnItemSchema.safeParse(draft)
+    const parsed = returnItemSchema.safeParse(draft)
 
     if (!parsed.success) {
-      setErrors(
-        flattenErrors(parsed.error),
-      )
-
+      setErrors(flattenErrors(parsed.error))
       return
     }
 
@@ -152,22 +109,16 @@ export function ItemDialog({
     >
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
-            {title}
-          </DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
 
           <DialogDescription>
-            Masukkan detail material yang diterima.
-            Foto dokumentasi penerimaan diisi pada
-            bagian Header Return.
+            Masukkan detail material yang diterima. Foto dokumentasi
+            penerimaan diisi pada bagian Header Return.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-5 py-2">
-
-          {/* ==================================================
-              IDENTITAS MATERIAL
-              ================================================== */}
+          {/* IDENTITAS MATERIAL */}
 
           <fieldset className="flex flex-col gap-3">
             <legend className="text-sm font-semibold">
@@ -175,30 +126,22 @@ export function ItemDialog({
             </legend>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
               {/* DIAMETER */}
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="item-diameter">
                   Diameter
-                  <span className="ml-1 text-destructive">
-                    *
-                  </span>
+                  <span className="ml-1 text-destructive">*</span>
                 </Label>
 
                 <Input
                   id="item-diameter"
                   value={draft.diameter}
                   onChange={(event) =>
-                    setField(
-                      'diameter',
-                      event.target.value,
-                    )
+                    setField('diameter', event.target.value)
                   }
                   placeholder={'Contoh: 2"'}
-                  aria-invalid={Boolean(
-                    errors.diameter,
-                  )}
+                  aria-invalid={Boolean(errors.diameter)}
                 />
 
                 {errors.diameter && (
@@ -213,9 +156,7 @@ export function ItemDialog({
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="item-tebal">
                   Tebal
-                  <span className="ml-1 text-destructive">
-                    *
-                  </span>
+                  <span className="ml-1 text-destructive">*</span>
                 </Label>
 
                 <Input
@@ -225,15 +166,10 @@ export function ItemDialog({
                   min="0"
                   value={draft.tebal}
                   onChange={(event) =>
-                    setField(
-                      'tebal',
-                      event.target.value,
-                    )
+                    setField('tebal', event.target.value)
                   }
                   placeholder="Contoh: 1.2"
-                  aria-invalid={Boolean(
-                    errors.tebal,
-                  )}
+                  aria-invalid={Boolean(errors.tebal)}
                 />
 
                 {errors.tebal && (
@@ -248,9 +184,7 @@ export function ItemDialog({
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="item-panjang">
                   Panjang
-                  <span className="ml-1 text-destructive">
-                    *
-                  </span>
+                  <span className="ml-1 text-destructive">*</span>
                 </Label>
 
                 <Input
@@ -260,15 +194,10 @@ export function ItemDialog({
                   min="0"
                   value={draft.panjang}
                   onChange={(event) =>
-                    setField(
-                      'panjang',
-                      event.target.value,
-                    )
+                    setField('panjang', event.target.value)
                   }
                   placeholder="Contoh: 6000"
-                  aria-invalid={Boolean(
-                    errors.panjang,
-                  )}
+                  aria-invalid={Boolean(errors.panjang)}
                 />
 
                 {errors.panjang && (
@@ -281,18 +210,13 @@ export function ItemDialog({
               {/* BATCH */}
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="item-batch">
-                  Batch
-                </Label>
+                <Label htmlFor="item-batch">Batch</Label>
 
                 <Input
                   id="item-batch"
                   value={draft.batch}
                   onChange={(event) =>
-                    setField(
-                      'batch',
-                      event.target.value,
-                    )
+                    setField('batch', event.target.value)
                   }
                   placeholder="Opsional"
                   maxLength={50}
@@ -308,18 +232,13 @@ export function ItemDialog({
               {/* NO BOX */}
 
               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <Label htmlFor="item-no-box">
-                  No Box
-                </Label>
+                <Label htmlFor="item-no-box">No Box</Label>
 
                 <Input
                   id="item-no-box"
                   value={draft.no_box}
                   onChange={(event) =>
-                    setField(
-                      'no_box',
-                      event.target.value,
-                    )
+                    setField('no_box', event.target.value)
                   }
                   placeholder="Opsional"
                   maxLength={50}
@@ -334,25 +253,18 @@ export function ItemDialog({
             </div>
           </fieldset>
 
-          {/* ==================================================
-              QUANTITY
-              ================================================== */}
+          {/* QUANTITY */}
 
           <fieldset className="flex flex-col gap-3">
-            <legend className="text-sm font-semibold">
-              Quantity
-            </legend>
+            <legend className="text-sm font-semibold">Quantity</legend>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
               {/* QTY SURAT JALAN */}
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="item-qty-sj">
                   Qty Surat Jalan
-                  <span className="ml-1 text-destructive">
-                    *
-                  </span>
+                  <span className="ml-1 text-destructive">*</span>
                 </Label>
 
                 <Input
@@ -360,25 +272,16 @@ export function ItemDialog({
                   type="number"
                   step="1"
                   min="0"
-                  value={
-                    draft.qty_surat_jalan
-                  }
+                  value={draft.qty_surat_jalan}
                   onChange={(event) =>
-                    setField(
-                      'qty_surat_jalan',
-                      event.target.value,
-                    )
+                    setField('qty_surat_jalan', event.target.value)
                   }
-                  aria-invalid={Boolean(
-                    errors.qty_surat_jalan,
-                  )}
+                  aria-invalid={Boolean(errors.qty_surat_jalan)}
                 />
 
                 {errors.qty_surat_jalan && (
                   <p className="text-xs text-destructive">
-                    {
-                      errors.qty_surat_jalan
-                    }
+                    {errors.qty_surat_jalan}
                   </p>
                 )}
               </div>
@@ -388,9 +291,7 @@ export function ItemDialog({
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="item-qty-aktual">
                   Qty Aktual Diterima
-                  <span className="ml-1 text-destructive">
-                    *
-                  </span>
+                  <span className="ml-1 text-destructive">*</span>
                 </Label>
 
                 <Input
@@ -398,43 +299,28 @@ export function ItemDialog({
                   type="number"
                   step="1"
                   min="0"
-                  value={
-                    draft.qty_aktual_diterima
-                  }
+                  value={draft.qty_aktual_diterima}
                   onChange={(event) =>
-                    setField(
-                      'qty_aktual_diterima',
-                      event.target.value,
-                    )
+                    setField('qty_aktual_diterima', event.target.value)
                   }
-                  aria-invalid={Boolean(
-                    errors.qty_aktual_diterima,
-                  )}
+                  aria-invalid={Boolean(errors.qty_aktual_diterima)}
                 />
 
                 {errors.qty_aktual_diterima && (
                   <p className="text-xs text-destructive">
-                    {
-                      errors.qty_aktual_diterima
-                    }
+                    {errors.qty_aktual_diterima}
                   </p>
                 )}
 
                 <QtyDiff
-                  qtySj={Number(
-                    draft.qty_surat_jalan || 0,
-                  )}
-                  qtyAktual={Number(
-                    draft.qty_aktual_diterima || 0,
-                  )}
+                  qtySj={Number(draft.qty_surat_jalan || 0)}
+                  qtyAktual={Number(draft.qty_aktual_diterima || 0)}
                 />
               </div>
             </div>
           </fieldset>
 
-          {/* ==================================================
-              KONDISI & LOKASI
-              ================================================== */}
+          {/* KONDISI & LOKASI */}
 
           <fieldset className="flex flex-col gap-3">
             <legend className="text-sm font-semibold">
@@ -442,56 +328,42 @@ export function ItemDialog({
             </legend>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
               {/* KONDISI MATERIAL */}
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="item-kondisi">
                   Kondisi Material
-                  <span className="ml-1 text-destructive">
-                    *
-                  </span>
+                  <span className="ml-1 text-destructive">*</span>
                 </Label>
 
                 <Select
-                  value={
-                    draft.kondisi_material
-                  }
+                  value={draft.kondisi_material}
                   onValueChange={(value) =>
-                    setField(
-                      'kondisi_material',
-                      value ?? '',
-                    )
+                    setField('kondisi_material', value ?? '')
                   }
                 >
                   <SelectTrigger
                     id="item-kondisi"
-                    aria-invalid={Boolean(
-                      errors.kondisi_material,
-                    )}
+                    aria-invalid={Boolean(errors.kondisi_material)}
                   >
                     <SelectValue placeholder="Pilih kondisi material" />
                   </SelectTrigger>
 
                   <SelectContent>
-                    {KONDISI_OPTIONS.map(
-                      (option) => (
-                        <SelectItem
-                          key={option}
-                          value={option ?? ''}
-                        >
-                          {option}
-                        </SelectItem>
-                      ),
-                    )}
+                    {KONDISI_OPTIONS.map((option) => (
+                      <SelectItem
+                        key={option}
+                        value={option ?? ''}
+                      >
+                        {option}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
                 {errors.kondisi_material && (
                   <p className="text-xs text-destructive">
-                    {
-                      errors.kondisi_material
-                    }
+                    {errors.kondisi_material}
                   </p>
                 )}
               </div>
@@ -499,25 +371,23 @@ export function ItemDialog({
               {/* SLOC */}
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="item-sloc">
-                  Lokasi / SLOC
-                </Label>
+                <Label htmlFor="item-sloc">Lokasi / SLOC</Label>
 
                 <Select
-    value={draft.sloc}
-    onValueChange={(value) =>
-      setField('sloc', value ?? '')
-    }
-  >
-    <SelectTrigger id="item-sloc">
-      <SelectValue placeholder="Pilih Lokasi / SLOC" />
-    </SelectTrigger>
+                  value={draft.sloc}
+                  onValueChange={(value) =>
+                    setField('sloc', value ?? '')
+                  }
+                >
+                  <SelectTrigger id="item-sloc">
+                    <SelectValue placeholder="Pilih Lokasi / SLOC" />
+                  </SelectTrigger>
 
-    <SelectContent>
-      <SelectItem value="5N12">5N12</SelectItem>
-      <SelectItem value="5B02">5B02</SelectItem>
-    </SelectContent>
-  </Select>
+                  <SelectContent>
+                    <SelectItem value="5N12">5N12</SelectItem>
+                    <SelectItem value="5B02">5B02</SelectItem>
+                  </SelectContent>
+                </Select>
 
                 {errors.sloc && (
                   <p className="text-xs text-destructive">
@@ -529,17 +399,13 @@ export function ItemDialog({
           </fieldset>
         </div>
 
-        {/* ==================================================
-            FOOTER
-            ================================================== */}
+        {/* FOOTER */}
 
         <DialogFooter>
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              handleOpenChange(false)
-            }
+            onClick={() => handleOpenChange(false)}
             disabled={saving}
           >
             Batal

@@ -1,11 +1,13 @@
-
 'use client'
+
+import { memo, useMemo } from 'react'
 
 import {
   Bar,
   BarChart,
   CartesianGrid,
   ComposedChart,
+  LabelList,
   Line,
   XAxis,
   YAxis,
@@ -31,6 +33,7 @@ import {
 import {
   formatDate,
   formatMonthLabel,
+  formatNumber,
 } from '@/lib/format'
 
 const trendConfig = {
@@ -44,10 +47,35 @@ const trendConfig = {
   },
 } satisfies ChartConfig
 
-const customerConfig = {
-  count: {
-    label: 'Return',
+const customerQtyConfig = {
+  qty: {
+    label: 'Qty Aktual',
     color: 'var(--chart-3)',
+  },
+} satisfies ChartConfig
+
+const customerReturnConfig = {
+  count: {
+    label: 'Jumlah Return',
+    color: 'var(--chart-4)',
+  },
+} satisfies ChartConfig
+
+const adminProgressConfig = {
+  filled: {
+    label: 'Terisi',
+    color: 'var(--chart-2)',
+  },
+  missing: {
+    label: 'Belum Terisi',
+    color: 'var(--chart-4)',
+  },
+} satisfies ChartConfig
+
+const disposisiConfig = {
+  count: {
+    label: 'Jumlah Return',
+    color: 'var(--chart-5)',
   },
 } satisfies ChartConfig
 
@@ -57,122 +85,150 @@ type TrendRow = {
   qty: number
 }
 
-type ChartGroupRow = {
+type CustomerQtyRow = {
+  name: string
+  qty: number
+}
+
+type CustomerReturnRow = {
   name: string
   count: number
 }
 
-type LocationSeries = {
-  dataKey: string
+type AdminProgressRow = {
   name: string
+  label: string
+  filled: number
+  missing: number
+  filledPercent: number
 }
 
-export function ReturnChart({
-  data,
-  mode,
-  customerData,
-  locationData,
-  locationSeries,
-}: {
+type DisposisiRow = {
+  name: string
+  count: number
+}
+
+type ReturnChartProps = {
   data: TrendRow[]
   mode: 'day' | 'month'
-  statusData: ChartGroupRow[]
-  customerData: ChartGroupRow[]
-  locationData: Record<string, string | number>[]
-  locationSeries: LocationSeries[]
-}) {
-  /*
-   * ==========================================================
-   * GRAFIK 1
-   * TREND RETURN
-   * ==========================================================
-   */
+  customerQtyData: CustomerQtyRow[]
+  customerData: CustomerReturnRow[]
+  adminProgressData: AdminProgressRow[]
+  disposisiData: DisposisiRow[]
+}
 
-  const trendRows = data.map((d) => ({
-    ...d,
+function ChartEmptyState({ description }: { description: string }) {
+  return (
+    <div className="flex min-h-64 items-center justify-center">
+      <EmptyState title="Belum ada data" description={description} />
+    </div>
+  )
+}
 
-    label:
-      mode === 'day'
-        ? formatDate(d.key).slice(0, 5)
-        : formatMonthLabel(d.key),
+export const ReturnChart = memo(function ReturnChart({
+  data,
+  mode,
+  customerQtyData,
+  customerData,
+  adminProgressData,
+  disposisiData,
+}: ReturnChartProps) {
+  const trendRows = useMemo(
+    () =>
+      data.map((row) => ({
+        ...row,
+        label:
+          mode === 'day'
+            ? formatDate(row.key).slice(0, 5)
+            : formatMonthLabel(row.key),
+        fullLabel:
+          mode === 'day'
+            ? formatDate(row.key)
+            : formatMonthLabel(row.key),
+      })),
+    [data, mode],
+  )
 
-    fullLabel:
-      mode === 'day'
-        ? formatDate(d.key)
-        : formatMonthLabel(d.key),
-  }))
+  const customerQtyRows = useMemo(
+    () => customerQtyData.slice(0, 10),
+    [customerQtyData],
+  )
 
-  /*
-   * ==========================================================
-   * GRAFIK 3
-   * RETURN PER CUSTOMER
-   * ==========================================================
-   */
+  const customerReturnRows = useMemo(
+    () => customerData.slice(0, 10),
+    [customerData],
+  )
 
-  const customerRows = customerData.slice(0, 10)
+  const adminProgressRows = useMemo(
+    () => adminProgressData,
+    [adminProgressData],
+  )
 
-  /*
-   * ==========================================================
-   * KONFIGURASI GRAFIK LOKASI
-   * ==========================================================
-   */
+  const disposisiRows = useMemo(
+    () => disposisiData,
+    [disposisiData],
+  )
 
-  const locationConfig = Object.fromEntries(
-    locationSeries.map((series, index) => [
-      series.dataKey,
-      {
-        label: series.name,
-        color: `var(--chart-${(index % 5) + 1})`,
-      },
-    ]),
-  ) satisfies ChartConfig
+  const hasAdminProgress = adminProgressRows.some(
+    (row) => row.filled + row.missing > 0,
+  )
+
+  const hasDisposisiData = disposisiRows.some(
+    (row) => row.count > 0,
+  )
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {/* ======================================================
-          GRAFIK 1: TREND RETURN
-          ====================================================== */}
+    <div className="space-y-4">
+      {/* Grafik 1: tren penerimaan dibuat selebar area konten. */}
+      <Card className="overflow-hidden border-border/80 shadow-sm">
+        <CardHeader className="gap-1 pb-2 sm:px-6 sm:pt-5">
+          <div className="flex items-start gap-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+              01
+            </span>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            Trend Return
-          </CardTitle>
+            <div className="min-w-0">
+              <CardTitle className="text-base">
+                Tren Penerimaan Return
+              </CardTitle>
 
-          <CardDescription>
-            Jumlah penerimaan return dan Qty Aktual per{' '}
-            {mode === 'day' ? 'tanggal' : 'bulan'}
-          </CardDescription>
+              <CardDescription className="mt-1">
+                Jumlah transaksi dan Qty Aktual per{' '}
+                {mode === 'day' ? 'tanggal' : 'bulan'}.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-2 pb-4 sm:px-5 sm:pb-5">
           {trendRows.length === 0 ? (
-            <EmptyState
-              title="Belum ada data"
-              description="Grafik akan tampil setelah ada penerimaan return."
-            />
+            <ChartEmptyState description="Grafik tren akan tampil setelah ada penerimaan Return pada periode yang dipilih." />
           ) : (
             <ChartContainer
               config={trendConfig}
-              className="h-64 w-full"
+              className="h-[300px] w-full sm:h-[340px]"
             >
               <ComposedChart
                 data={trendRows}
                 margin={{
-                  left: -16,
-                  right: 12,
-                  top: 8,
-                  bottom: 4,
+                  left: -8,
+                  right: 14,
+                  top: 24,
+                  bottom: 12,
                 }}
               >
-                <CartesianGrid vertical={false} />
+                <CartesianGrid
+                  vertical={false}
+                  strokeDasharray="3 3"
+                />
 
                 <XAxis
                   dataKey="label"
                   tickLine={false}
                   axisLine={false}
-                  tickMargin={8}
-                  minTickGap={16}
+                  tickMargin={9}
+                  minTickGap={18}
+                  fontSize={11}
                 />
 
                 <YAxis
@@ -180,7 +236,8 @@ export function ReturnChart({
                   allowDecimals={false}
                   tickLine={false}
                   axisLine={false}
-                  width={35}
+                  width={38}
+                  fontSize={11}
                 />
 
                 <YAxis
@@ -188,15 +245,25 @@ export function ReturnChart({
                   orientation="right"
                   tickLine={false}
                   axisLine={false}
-                  width={45}
+                  width={58}
+                  fontSize={11}
+                  tickFormatter={(value) =>
+                    formatNumber(Number(value))
+                  }
                 />
 
                 <ChartTooltip
-                  cursor={false}
+                  cursor={{
+                    fill: 'var(--muted)',
+                    opacity: 0.35,
+                  }}
                   content={
                     <ChartTooltipContent
                       labelFormatter={(_, payload) =>
                         payload?.[0]?.payload?.fullLabel ?? ''
+                      }
+                      formatter={(value) =>
+                        formatNumber(Number(value))
                       }
                     />
                   }
@@ -206,192 +273,518 @@ export function ReturnChart({
                   yAxisId="returns"
                   dataKey="count"
                   fill="var(--color-count)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
+                  radius={[5, 5, 0, 0]}
+                  maxBarSize={42}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="count"
+                    position="top"
+                    offset={6}
+                    fill="var(--foreground)"
+                    fontSize={10}
+                    fontWeight={600}
+                    formatter={(value) =>
+                      formatNumber(Number(value))
+                    }
+                  />
+                </Bar>
 
                 <Line
                   yAxisId="qty"
                   dataKey="qty"
                   type="monotone"
                   stroke="var(--color-qty)"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
+                  strokeWidth={2.5}
+                  dot={{ r: 3, strokeWidth: 1.5 }}
                   activeDot={{ r: 5 }}
-                />
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="qty"
+                    position="bottom"
+                    offset={9}
+                    fill="var(--foreground)"
+                    fontSize={10}
+                    fontWeight={600}
+                    formatter={(value) =>
+                      formatNumber(Number(value))
+                    }
+                  />
+                </Line>
               </ComposedChart>
             </ChartContainer>
           )}
         </CardContent>
       </Card>
 
-      {/* ======================================================
-          GRAFIK 2: QTY LOCATION PER BULAN
-          GABUNGAN BATANG DAN GARIS
-          ====================================================== */}
+      {/* Grafik 2 dan 3: data Customer. */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card className="overflow-hidden border-border/80 shadow-sm">
+          <CardHeader className="gap-1 pb-2 sm:px-5 sm:pt-5">
+            <div className="flex items-start gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                02
+              </span>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            Qty Location per Bulan
-          </CardTitle>
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  Qty Aktual per Customer
+                </CardTitle>
 
-          <CardDescription>
-            Perbandingan batang dan tren Qty Aktual berdasarkan lokasi/SLOC setiap bulan
-          </CardDescription>
-        </CardHeader>
+                <CardDescription className="mt-1">
+                  10 customer dengan total Qty Aktual tertinggi.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
 
-        <CardContent>
-          {locationData.length === 0 ||
-          locationSeries.length === 0 ? (
-            <EmptyState
-              title="Belum ada data"
-              description="Data Qty Aktual per lokasi belum tersedia."
-            />
-          ) : (
-            <ChartContainer
-              config={locationConfig}
-              className="h-64 w-full"
-            >
-              <ComposedChart
-                data={locationData}
-                margin={{
-                  left: -16,
-                  right: 12,
-                  top: 8,
-                  bottom: 4,
-                }}
+          <CardContent className="px-2 pb-4 sm:px-4 sm:pb-5">
+            {customerQtyRows.length === 0 ? (
+              <ChartEmptyState description="Data Qty Aktual per Customer belum tersedia." />
+            ) : (
+              <ChartContainer
+                config={customerQtyConfig}
+                className="h-[330px] w-full sm:h-[360px]"
               >
-                <CartesianGrid vertical={false} />
+                <BarChart
+                  data={customerQtyRows}
+                  layout="vertical"
+                  margin={{
+                    left: 4,
+                    right: 62,
+                    top: 8,
+                    bottom: 8,
+                  }}
+                >
+                  <CartesianGrid
+                    horizontal={false}
+                    strokeDasharray="3 3"
+                  />
 
-                <XAxis
-                  dataKey="key"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  minTickGap={16}
-                  tickFormatter={(value) =>
-                    formatMonthLabel(String(value))
-                  }
-                />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={10}
+                    tickFormatter={(value) =>
+                      formatNumber(Number(value))
+                    }
+                  />
 
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  width={45}
-                />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={112}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={7}
+                    interval={0}
+                    fontSize={10}
+                  />
 
-                <ChartTooltip
-                  cursor={false}
-                  content={
-                    <ChartTooltipContent
-                      labelFormatter={(value) =>
-                        formatMonthLabel(String(value))
+                  <ChartTooltip
+                    cursor={{
+                      fill: 'var(--muted)',
+                      opacity: 0.35,
+                    }}
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) =>
+                          formatNumber(Number(value))
+                        }
+                      />
+                    }
+                  />
+
+                  <Bar
+                    dataKey="qty"
+                    fill="var(--color-qty)"
+                    radius={[0, 5, 5, 0]}
+                    maxBarSize={26}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey="qty"
+                      position="right"
+                      offset={7}
+                      fill="var(--foreground)"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(value) =>
+                        formatNumber(Number(value))
                       }
                     />
-                  }
-                />
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
 
-                {locationSeries.map((series, index) => (
-                  <Bar
-                    key={`bar-${series.dataKey}`}
-                    dataKey={series.dataKey}
-                    name={series.name}
-                    fill={`var(--chart-${(index % 5) + 1})`}
-                    fillOpacity={0.35}
-                    radius={[3, 3, 0, 0]}
-                    maxBarSize={32}
-                  />
-                ))}
+        <Card className="overflow-hidden border-border/80 shadow-sm">
+          <CardHeader className="gap-1 pb-2 sm:px-5 sm:pt-5">
+            <div className="flex items-start gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                03
+              </span>
 
-                {locationSeries.map((series, index) => (
-                  <Line
-                    key={`line-${series.dataKey}`}
-                    dataKey={series.dataKey}
-                    name={series.name}
-                    type="monotone"
-                    stroke={`var(--chart-${(index % 5) + 1})`}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </ComposedChart>
-            </ChartContainer>
-          )}
-        </CardContent>
-      </Card>
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  Jumlah Return per Customer
+                </CardTitle>
 
-      {/* ======================================================
-          GRAFIK 3: RETURN PER CUSTOMER
-          ====================================================== */}
+                <CardDescription className="mt-1">
+                  10 customer dengan jumlah transaksi Return terbanyak.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
 
-      <Card className="overflow-hidden lg:col-span-2">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            Return per Customer
-          </CardTitle>
-
-          <CardDescription>
-            Customer dengan jumlah penerimaan return terbanyak
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          {customerRows.length === 0 ? (
-            <EmptyState
-              title="Belum ada data"
-              description="Data customer return belum tersedia."
-            />
-          ) : (
-            <ChartContainer
-              config={customerConfig}
-              className="h-72 w-full"
-            >
-              <BarChart
-                data={customerRows}
-                layout="vertical"
-                margin={{
-                  left: 10,
-                  right: 20,
-                  top: 8,
-                  bottom: 8,
-                }}
+          <CardContent className="px-2 pb-4 sm:px-4 sm:pb-5">
+            {customerReturnRows.length === 0 ? (
+              <ChartEmptyState description="Data jumlah Return per Customer belum tersedia." />
+            ) : (
+              <ChartContainer
+                config={customerReturnConfig}
+                className="h-[330px] w-full sm:h-[360px]"
               >
-                <CartesianGrid horizontal={false} />
+                <BarChart
+                  data={customerReturnRows}
+                  layout="vertical"
+                  margin={{
+                    left: 4,
+                    right: 54,
+                    top: 8,
+                    bottom: 8,
+                  }}
+                >
+                  <CartesianGrid
+                    horizontal={false}
+                    strokeDasharray="3 3"
+                  />
 
-                <XAxis
-                  type="number"
-                  allowDecimals={false}
-                  tickLine={false}
-                  axisLine={false}
-                />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={10}
+                    tickFormatter={(value) =>
+                      formatNumber(Number(value))
+                    }
+                  />
 
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={120}
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={112}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={7}
+                    interval={0}
+                    fontSize={10}
+                  />
 
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent />}
-                />
+                  <ChartTooltip
+                    cursor={{
+                      fill: 'var(--muted)',
+                      opacity: 0.35,
+                    }}
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) =>
+                          formatNumber(Number(value))
+                        }
+                      />
+                    }
+                  />
 
-                <Bar
-                  dataKey="count"
-                  fill="var(--color-count)"
-                  radius={[0, 4, 4, 0]}
-                  maxBarSize={28}
+                  <Bar
+                    dataKey="count"
+                    fill="var(--color-count)"
+                    radius={[0, 5, 5, 0]}
+                    maxBarSize={28}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey="count"
+                      position="right"
+                      offset={7}
+                      fill="var(--foreground)"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(value) =>
+                        formatNumber(Number(value))
+                      }
+                    />
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Grafik 4 dan 5: progres administrasi. */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card className="overflow-hidden border-border/80 shadow-sm">
+          <CardHeader className="gap-1 pb-2 sm:px-5 sm:pt-5">
+            <div className="flex items-start gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                04
+              </span>
+
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  Kelengkapan Administrasi
+                </CardTitle>
+
+                <CardDescription className="mt-1">
+                  Persentase pada label menunjukkan jumlah transaksi
+                  yang sudah terisi. No Claim dihitung terisi jika
+                  minimal satu dari empat kolom digunakan.
+                </CardDescription>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-2 pt-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className="size-2.5 rounded-sm"
+                  style={{
+                    backgroundColor: 'var(--color-filled)',
+                  }}
                 />
-              </BarChart>
-            </ChartContainer>
-          )}
-        </CardContent>
-      </Card>
+                Terisi
+              </span>
+
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className="size-2.5 rounded-sm"
+                  style={{
+                    backgroundColor: 'var(--color-missing)',
+                  }}
+                />
+                Belum Terisi
+              </span>
+            </div>
+          </CardHeader>
+
+          <CardContent className="px-2 pb-4 sm:px-4 sm:pb-5">
+            {!hasAdminProgress ? (
+              <ChartEmptyState description="Belum ada transaksi aktif pada filter Dashboard yang dipilih." />
+            ) : (
+              <ChartContainer
+                config={adminProgressConfig}
+                className="h-[330px] w-full sm:h-[360px]"
+              >
+                <BarChart
+                  data={adminProgressRows}
+                  layout="vertical"
+                  barGap={5}
+                  barCategoryGap="25%"
+                  margin={{
+                    left: 4,
+                    right: 44,
+                    top: 12,
+                    bottom: 8,
+                  }}
+                >
+                  <CartesianGrid
+                    horizontal={false}
+                    strokeDasharray="3 3"
+                  />
+
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={10}
+                    tickFormatter={(value) =>
+                      formatNumber(Number(value))
+                    }
+                  />
+
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={132}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={7}
+                    interval={0}
+                    fontSize={10}
+                  />
+
+                  <ChartTooltip
+                    cursor={{
+                      fill: 'var(--muted)',
+                      opacity: 0.35,
+                    }}
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) =>
+                          formatNumber(Number(value))
+                        }
+                      />
+                    }
+                  />
+
+                  <Bar
+                    dataKey="filled"
+                    fill="var(--color-filled)"
+                    radius={[0, 4, 4, 0]}
+                    maxBarSize={22}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey="filled"
+                      position="right"
+                      offset={5}
+                      fill="var(--foreground)"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(value) =>
+                        formatNumber(Number(value))
+                      }
+                    />
+                  </Bar>
+
+                  <Bar
+                    dataKey="missing"
+                    fill="var(--color-missing)"
+                    radius={[0, 4, 4, 0]}
+                    maxBarSize={22}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey="missing"
+                      position="right"
+                      offset={5}
+                      fill="var(--foreground)"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(value) =>
+                        formatNumber(Number(value))
+                      }
+                    />
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-border/80 shadow-sm">
+          <CardHeader className="gap-1 pb-2 sm:px-5 sm:pt-5">
+            <div className="flex items-start gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                05
+              </span>
+
+              <div className="min-w-0">
+                <CardTitle className="text-base">
+                  Sebaran Disposisi
+                </CardTitle>
+
+                <CardDescription className="mt-1">
+                  Jumlah transaksi berdasarkan keputusan disposisi.
+                  Transaksi yang belum memiliki pilihan masuk ke
+                  kategori Belum ditentukan.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="px-2 pb-4 sm:px-4 sm:pb-5">
+            {!hasDisposisiData ? (
+              <ChartEmptyState description="Belum ada data disposisi pada transaksi aktif di filter Dashboard ini." />
+            ) : (
+              <ChartContainer
+                config={disposisiConfig}
+                className="h-[330px] w-full sm:h-[360px]"
+              >
+                <BarChart
+                  data={disposisiRows}
+                  layout="vertical"
+                  margin={{
+                    left: 4,
+                    right: 54,
+                    top: 8,
+                    bottom: 8,
+                  }}
+                >
+                  <CartesianGrid
+                    horizontal={false}
+                    strokeDasharray="3 3"
+                  />
+
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={10}
+                    tickFormatter={(value) =>
+                      formatNumber(Number(value))
+                    }
+                  />
+
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={120}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={7}
+                    interval={0}
+                    fontSize={10}
+                  />
+
+                  <ChartTooltip
+                    cursor={{
+                      fill: 'var(--muted)',
+                      opacity: 0.35,
+                    }}
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value) =>
+                          formatNumber(Number(value))
+                        }
+                      />
+                    }
+                  />
+
+                  <Bar
+                    dataKey="count"
+                    fill="var(--color-count)"
+                    radius={[0, 5, 5, 0]}
+                    maxBarSize={26}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey="count"
+                      position="right"
+                      offset={7}
+                      fill="var(--foreground)"
+                      fontSize={10}
+                      fontWeight={600}
+                      formatter={(value) =>
+                        formatNumber(Number(value))
+                      }
+                    />
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
-}
+})
+
+ReturnChart.displayName = 'ReturnChart'

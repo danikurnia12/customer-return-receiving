@@ -2,6 +2,7 @@
 
 import type { ComponentProps } from 'react'
 
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import {
@@ -18,7 +19,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-
 import {
   createReturnAction,
   cleanupUnattachedReturnPhotosAction,
@@ -27,10 +27,9 @@ import {
 import { EmptyState } from '@/components/app/states'
 import {
   EMPTY_ITEM,
-  ItemDialog,
   draftToInput,
   type ItemDraft,
-} from '@/components/returns/item-dialog'
+} from '@/lib/return-item-draft'
 import { ItemsTable } from '@/components/returns/items-table'
 import { PhotoUpload } from '@/components/returns/photo-upload'
 
@@ -67,6 +66,25 @@ import {
   returnHeaderSchema,
 } from '@/lib/validation'
 
+/*
+ * ItemDialog hanya diperlukan ketika pengguna menambah atau mengedit
+ * item. Muat modulnya saat dialog benar-benar dibuka agar komponen
+ * form utama tidak perlu memuat seluruh bundle dialog sejak awal.
+ */
+const ItemDialog = dynamic(
+  () =>
+    import('@/components/returns/item-dialog').then(
+      (module) => module.ItemDialog,
+    ),
+  {
+    loading: () => (
+      <div className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">
+        Memuat form item material...
+      </div>
+    ),
+  },
+)
+
 interface HeaderState {
   tanggal_penerimaan: string
   no_sppb: string
@@ -97,51 +115,39 @@ export function ReturnForm({
 }: ReturnFormProps) {
   const router = useRouter()
 
-  const [header, setHeader] =
-    useState<HeaderState>({
-      tanggal_penerimaan: todayISO(),
-      no_sppb: '',
-      no_claim: '',
-      customer: '',
-      pic_penerima: defaultPic,
-      catatan: '',
+  const [header, setHeader] = useState<HeaderState>({
+    tanggal_penerimaan: todayISO(),
+    no_sppb: '',
+    no_claim: '',
+    customer: '',
+    pic_penerima: defaultPic,
+    catatan: '',
 
-      foto_surat_jalan_url: null,
-      foto_surat_jalan_preview: null,
+    foto_surat_jalan_url: null,
+    foto_surat_jalan_preview: null,
 
-      foto_material_url: null,
-      foto_material_preview: null,
-    })
+    foto_material_url: null,
+    foto_material_preview: null,
+  })
 
-  const [errors, setErrors] =
-    useState<Record<string, string>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [items, setItems] = useState<KeyedDraft[]>([])
 
-  const [items, setItems] =
-    useState<KeyedDraft[]>([])
+  const [dialog, setDialog] = useState<{
+    open: boolean
+    key: string | null
+  }>({
+    open: false,
+    key: null,
+  })
 
-  const [dialog, setDialog] =
-    useState<{
-      open: boolean
-      key: string | null
-    }>({
-      open: false,
-      key: null,
-    })
+  const [deleteKey, setDeleteKey] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const [deleteKey, setDeleteKey] =
-    useState<string | null>(null)
-
-  const [confirmOpen, setConfirmOpen] =
-    useState(false)
-
-  const [saving, setSaving] =
-    useState(false)
-
-  /*
-   * ============================================================
-   * HEADER FIELD
-   * ============================================================
-   */
+  /* ============================================================
+     HEADER FIELD
+     ============================================================ */
 
   const setField = (
     key: keyof HeaderState,
@@ -160,21 +166,15 @@ export function ReturnForm({
     }
   }
 
-  /*
-   * ============================================================
-   * ITEM EDITING
-   * ============================================================
-   */
+  /* ============================================================
+     ITEM EDITING
+     ============================================================ */
 
   const editing = dialog.key
-    ? items.find(
-        (item) => item.key === dialog.key,
-      )
+    ? items.find((item) => item.key === dialog.key)
     : undefined
 
-  const saveItem = (
-    draft: ItemDraft,
-  ) => {
+  const saveItem = (draft: ItemDraft) => {
     if (dialog.key) {
       setItems((current) =>
         current.map((item) =>
@@ -187,9 +187,7 @@ export function ReturnForm({
         ),
       )
 
-      toast.success(
-        'Item berhasil diperbarui',
-      )
+      toast.success('Item berhasil diperbarui')
     } else {
       setItems((current) => [
         ...current,
@@ -199,9 +197,7 @@ export function ReturnForm({
         },
       ])
 
-      toast.success(
-        'Item berhasil ditambahkan',
-      )
+      toast.success('Item berhasil ditambahkan')
     }
 
     if (errors.items) {
@@ -217,11 +213,9 @@ export function ReturnForm({
     })
   }
 
-  /*
-   * ============================================================
-   * SUMMARY
-   * ============================================================
-   */
+  /* ============================================================
+     SUMMARY
+     ============================================================ */
 
   const summary = useMemo(() => {
     let totalSj = 0
@@ -229,23 +223,11 @@ export function ReturnForm({
     let selisihCount = 0
 
     for (const item of items) {
-      const qtySj = Number(
-        item.qty_surat_jalan || 0,
-      )
+      const qtySj = Number(item.qty_surat_jalan || 0)
+      const qtyAktual = Number(item.qty_aktual_diterima || 0)
 
-      const qtyAktual = Number(
-        item.qty_aktual_diterima || 0,
-      )
-
-      totalSj += Number.isFinite(qtySj)
-        ? qtySj
-        : 0
-
-      totalAktual += Number.isFinite(
-        qtyAktual,
-      )
-        ? qtyAktual
-        : 0
+      totalSj += Number.isFinite(qtySj) ? qtySj : 0
+      totalAktual += Number.isFinite(qtyAktual) ? qtyAktual : 0
 
       if (qtySj !== qtyAktual) {
         selisihCount += 1
@@ -259,24 +241,17 @@ export function ReturnForm({
     }
   }, [items])
 
-  /*
-   * ============================================================
-   * VALIDATE BEFORE CONFIRMATION
-   * ============================================================
-   */
+  /* ============================================================
+     VALIDATE BEFORE CONFIRMATION
+     ============================================================ */
 
   const openConfirm = () => {
     if (saving) return
 
-    const parsed =
-      returnHeaderSchema.safeParse(
-        header,
-      )
-
-    const nextErrors =
-      parsed.success
-        ? {}
-        : flattenErrors(parsed.error)
+    const parsed = returnHeaderSchema.safeParse(header)
+    const nextErrors = parsed.success
+      ? {}
+      : flattenErrors(parsed.error)
 
     if (items.length === 0) {
       nextErrors.items =
@@ -285,26 +260,26 @@ export function ReturnForm({
 
     setErrors(nextErrors)
 
-    if (
-      Object.keys(nextErrors).length > 0
-    ) {
-      toast.error(
-        'Periksa kembali data yang wajib diisi.',
-      )
+    if (Object.keys(nextErrors).length > 0) {
+      toast.error('Periksa kembali data yang wajib diisi.')
       return
     }
+
     setConfirmOpen(true)
   }
-  /*
-   * ============================================================
-   * SUBMIT
-   * ============================================================
-   */
+
+  /* ============================================================
+     CANCEL FORM
+     ============================================================ */
+
   const cancelForm = async () => {
     if (saving) return
+
     const paths = [
       header.foto_surat_jalan_url,
-      header.foto_material_url,].filter((path): path is string => Boolean(path))
+      header.foto_material_url,
+    ].filter((path): path is string => Boolean(path))
+
     setSaving(true)
 
     try {
@@ -330,6 +305,10 @@ export function ReturnForm({
     }
   }
 
+  /* ============================================================
+     SUBMIT
+     ============================================================ */
+
   const submit = async () => {
     if (saving) return
 
@@ -341,16 +320,11 @@ export function ReturnForm({
         items: items.map(draftToInput),
       }
 
-      const response =
-        await createReturnAction(
-          payload,
-        )
+      const response = await createReturnAction(payload)
 
       if (!response.ok) {
         if (response.fieldErrors) {
-          setErrors(
-            response.fieldErrors,
-          )
+          setErrors(response.fieldErrors)
         }
 
         toast.error(
@@ -367,16 +341,12 @@ export function ReturnForm({
 
       setConfirmOpen(false)
 
-      router.replace(
-        `/returns/${response.data.id}`,
-      )
-
-      router.refresh()
+      // Server Action sudah menjalankan revalidateReturns().
+      // Navigasi ke halaman detail akan mengambil data Return terbaru;
+      // router.refresh() tambahan tidak diperlukan di sini.
+      router.replace(`/returns/${response.data.id}`)
     } catch (error) {
-      console.error(
-        '[ReturnForm] Submit error:',
-        error,
-      )
+      console.error('[ReturnForm] Submit error:', error)
 
       toast.error(
         'Terjadi kesalahan saat menyimpan penerimaan return.',
@@ -386,26 +356,18 @@ export function ReturnForm({
     }
   }
 
-  /*
-   * ============================================================
-   * HEADER INPUT HELPER
-   * ============================================================
-   */
+  /* ============================================================
+     HEADER INPUT HELPER
+     ============================================================ */
 
   const headerField = (
     key: keyof HeaderState,
     label: string,
-    props: ComponentProps<
-      typeof Input
-    > & {
+    props: ComponentProps<typeof Input> & {
       required?: boolean
     } = {},
   ) => {
-    const {
-      required,
-      ...inputProps
-    } = props
-
+    const { required, ...inputProps } = props
     const error = errors[key]
 
     return (
@@ -428,25 +390,12 @@ export function ReturnForm({
 
         <Input
           id={`h-${key}`}
-          value={
-            header[
-              key
-            ] as string
-          }
+          value={header[key] as string}
           onChange={(event) =>
-            setField(
-              key,
-              event.target.value,
-            )
+            setField(key, event.target.value)
           }
-          aria-invalid={Boolean(
-            error,
-          )}
-          aria-describedby={
-            error
-              ? `error-${key}`
-              : undefined
-          }
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `error-${key}` : undefined}
           className={
             error
               ? 'border-destructive focus-visible:ring-destructive'
@@ -468,15 +417,12 @@ export function ReturnForm({
     )
   }
 
-  /*
-   * ============================================================
-   * RENDER
-   * ============================================================
-   */
+  /* ============================================================
+     RENDER
+     ============================================================ */
 
   return (
     <div className="flex flex-col gap-6 pb-28 md:pb-0">
-
       {/* PAGE INTRO */}
 
       <section className="relative overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -494,9 +440,7 @@ export function ReturnForm({
                   SPINDO 5
                 </span>
 
-                <span className="text-xs text-muted-foreground">
-                  /
-                </span>
+                <span className="text-xs text-muted-foreground">/</span>
 
                 <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Warehouse
@@ -508,10 +452,8 @@ export function ReturnForm({
               </h1>
 
               <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Catat dokumen penerimaan,
-                kondisi aktual material, dan
-                dokumentasi sebagai evidence
-                proses return customer.
+                Catat dokumen penerimaan, kondisi aktual material, dan
+                dokumentasi sebagai evidence proses return customer.
               </p>
             </div>
           </div>
@@ -524,9 +466,7 @@ export function ReturnForm({
                 Status Dokumen
               </p>
 
-              <p className="text-sm font-semibold">
-                Draft Penerimaan
-              </p>
+              <p className="text-sm font-semibold">Draft Penerimaan</p>
             </div>
           </div>
         </div>
@@ -547,15 +487,13 @@ export function ReturnForm({
               </CardTitle>
 
               <CardDescription className="mt-1 leading-5">
-                Informasi utama penerimaan
-                material dari customer.
+                Informasi utama penerimaan material dari customer.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-7 p-5 sm:p-6">
-
           {/* DATA UTAMA */}
 
           <div>
@@ -568,7 +506,6 @@ export function ReturnForm({
             </div>
 
             <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-
               {headerField(
                 'tanggal_penerimaan',
                 'Tanggal Penerimaan',
@@ -584,8 +521,7 @@ export function ReturnForm({
                 'No SPPB / Surat Jalan',
                 {
                   required: true,
-                  placeholder:
-                    'Contoh: SJ-001234',
+                  placeholder: 'Contoh: SJ-001234',
                   maxLength: 100,
                 },
               )}
@@ -594,8 +530,7 @@ export function ReturnForm({
                 'no_claim',
                 'No Claim',
                 {
-                  placeholder:
-                    'Opsional',
+                  placeholder: 'Opsional',
                   maxLength: 100,
                 },
               )}
@@ -605,27 +540,17 @@ export function ReturnForm({
                 'Customer',
                 {
                   required: true,
-                  placeholder:
-                    'Nama customer',
-                  list:
-                    'customer-options',
-                  autoComplete:
-                    'off',
+                  placeholder: 'Nama customer',
+                  list: 'customer-options',
+                  autoComplete: 'off',
                   maxLength: 150,
                 },
               )}
 
               <datalist id="customer-options">
-                {customers.map(
-                  (customer) => (
-                    <option
-                      key={customer}
-                      value={
-                        customer
-                      }
-                    />
-                  ),
-                )}
+                {customers.map((customer) => (
+                  <option key={customer} value={customer} />
+                ))}
               </datalist>
 
               <div className="flex flex-col gap-2">
@@ -639,25 +564,16 @@ export function ReturnForm({
 
                 <Input
                   id="h-pic_penerima"
-                  value={
-                    header.pic_penerima
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setField(
-                      'pic_penerima',
-                      event.target
-                        .value,
-                    )
+                  value={header.pic_penerima}
+                  onChange={(event) =>
+                    setField('pic_penerima', event.target.value)
                   }
                   placeholder="Nama penerima"
                   maxLength={100}
                 />
 
                 <p className="text-xs text-muted-foreground">
-                  PIC yang melakukan proses
-                  penerimaan material.
+                  PIC yang melakukan proses penerimaan material.
                 </p>
               </div>
             </div>
@@ -675,22 +591,16 @@ export function ReturnForm({
               </Label>
 
               <p className="mt-1 text-xs text-muted-foreground">
-                Gunakan untuk mencatat
-                informasi khusus yang perlu
+                Gunakan untuk mencatat informasi khusus yang perlu
                 diketahui pada proses return.
               </p>
             </div>
 
             <Textarea
               id="h-catatan"
-              value={
-                header.catatan
-              }
+              value={header.catatan}
               onChange={(event) =>
-                setField(
-                  'catatan',
-                  event.target.value,
-                )
+                setField('catatan', event.target.value)
               }
               placeholder="Contoh: material diterima dengan kondisi kemasan rusak..."
               rows={3}
@@ -698,8 +608,7 @@ export function ReturnForm({
             />
 
             <p className="mt-1.5 text-right text-xs tabular-nums text-muted-foreground">
-              {header.catatan.length}
-              /1000
+              {header.catatan.length}/1000
             </p>
           </div>
 
@@ -717,10 +626,8 @@ export function ReturnForm({
                 </h3>
 
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Dokumentasikan satu Surat
-                  Jalan dan satu kondisi
-                  aktual material untuk setiap
-                  penerimaan.
+                  Dokumentasikan satu Surat Jalan dan satu kondisi aktual
+                  material untuk setiap penerimaan.
                 </p>
               </div>
             </div>
@@ -730,25 +637,14 @@ export function ReturnForm({
                 <PhotoUpload
                   label="Foto Surat Jalan"
                   kind="surat-jalan"
-                  path={
-                    header.foto_surat_jalan_url
-                  }
-                  preview={
-                    header.foto_surat_jalan_preview
-                  }
-                  onChange={(
-                    path,
-                    preview,
-                  ) =>
-                    setHeader(
-                      (current) => ({
-                        ...current,
-                        foto_surat_jalan_url:
-                          path,
-                        foto_surat_jalan_preview:
-                          preview,
-                      }),
-                    )
+                  path={header.foto_surat_jalan_url}
+                  preview={header.foto_surat_jalan_preview}
+                  onChange={(path, preview) =>
+                    setHeader((current) => ({
+                      ...current,
+                      foto_surat_jalan_url: path,
+                      foto_surat_jalan_preview: preview,
+                    }))
                   }
                 />
               </div>
@@ -757,25 +653,14 @@ export function ReturnForm({
                 <PhotoUpload
                   label="Foto Aktual Material"
                   kind="material"
-                  path={
-                    header.foto_material_url
-                  }
-                  preview={
-                    header.foto_material_preview
-                  }
-                  onChange={(
-                    path,
-                    preview,
-                  ) =>
-                    setHeader(
-                      (current) => ({
-                        ...current,
-                        foto_material_url:
-                          path,
-                        foto_material_preview:
-                          preview,
-                      }),
-                    )
+                  path={header.foto_material_url}
+                  preview={header.foto_material_preview}
+                  onChange={(path, preview) =>
+                    setHeader((current) => ({
+                      ...current,
+                      foto_material_url: path,
+                      foto_material_preview: preview,
+                    }))
                   }
                 />
               </div>
@@ -800,9 +685,8 @@ export function ReturnForm({
                 </CardTitle>
 
                 <CardDescription className="mt-1 leading-5">
-                  Tambahkan seluruh material
-                  yang terdapat pada satu Surat
-                  Jalan.
+                  Tambahkan seluruh material yang terdapat pada satu
+                  Surat Jalan.
                 </CardDescription>
               </div>
             </div>
@@ -830,48 +714,31 @@ export function ReturnForm({
               <EmptyState
                 title="Belum ada item material"
                 description="Klik Tambah Item untuk memasukkan material yang diterima dari customer."
-                className={
-                  errors.items
-                    ? 'border-destructive/50'
-                    : undefined
-                }
+                className={errors.items ? 'border-destructive/50' : undefined}
               />
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border">
               <ItemsTable
-                rows={items.map(
-                  (item) => ({
-                    key: item.key,
-                    diameter:
-                      item.diameter,
-                    tebal:
-                      item.tebal,
-                    panjang:
-                      item.panjang,
-                    batch:
-                      item.batch,
-                    no_box:
-                      item.no_box,
-                    qty_surat_jalan:
-                      item.qty_surat_jalan,
-                    qty_aktual_diterima:
-                      item.qty_aktual_diterima,
-                    kondisi_material:
-                      item.kondisi_material,
-                    sloc:
-                      item.sloc,
-                  }),
-                )}
+                rows={items.map((item) => ({
+                  key: item.key,
+                  diameter: item.diameter,
+                  tebal: item.tebal,
+                  panjang: item.panjang,
+                  batch: item.batch,
+                  no_box: item.no_box,
+                  qty_surat_jalan: item.qty_surat_jalan,
+                  qty_aktual_diterima: item.qty_aktual_diterima,
+                  kondisi_material: item.kondisi_material,
+                  sloc: item.sloc,
+                }))}
                 onEdit={(key) =>
                   setDialog({
                     open: true,
                     key,
                   })
                 }
-                onDelete={
-                  setDeleteKey
-                }
+                onDelete={setDeleteKey}
               />
             </div>
           )}
@@ -880,10 +747,7 @@ export function ReturnForm({
             <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
 
-              <p
-                role="alert"
-                className="font-medium text-destructive"
-              >
+              <p role="alert" className="font-medium text-destructive">
                 {errors.items}
               </p>
             </div>
@@ -894,9 +758,7 @@ export function ReturnForm({
       {/* SUMMARY / ACTION BAR */}
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 md:shadow-none">
-
         <div className="mx-auto flex max-w-screen-xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-
           {/* SUMMARY */}
 
           <div className="flex min-w-0 items-center gap-4 rounded-xl border bg-card px-4 py-3 shadow-sm">
@@ -907,33 +769,23 @@ export function ReturnForm({
             <div className="min-w-0">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-base font-bold tabular-nums">
-                  {formatNumber(
-                    items.length,
-                  )}
+                  {formatNumber(items.length)}
                 </span>
 
-                <span className="text-sm text-muted-foreground">
-                  item
-                </span>
+                <span className="text-sm text-muted-foreground">item</span>
               </div>
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span>
                   Qty aktual:{' '}
                   <strong className="font-semibold text-foreground">
-                    {formatNumber(
-                      summary.totalAktual,
-                    )}
+                    {formatNumber(summary.totalAktual)}
                   </strong>
                 </span>
 
-                {summary.selisihCount >
-                  0 && (
+                {summary.selisihCount > 0 && (
                   <span className="font-medium text-warning">
-                    {formatNumber(
-                      summary.selisihCount,
-                    )}{' '}
-                    item selisih
+                    {formatNumber(summary.selisihCount)} item selisih
                   </span>
                 )}
               </div>
@@ -956,7 +808,7 @@ export function ReturnForm({
             <Button
               type="button"
               onClick={openConfirm}
-              disabled={saving ||items.length === 0}
+              disabled={saving || items.length === 0}
               className="h-10 flex-1 gap-2 px-5 shadow-sm sm:flex-none"
             >
               {saving ? (
@@ -975,97 +827,57 @@ export function ReturnForm({
         </div>
       </div>
 
-      {/* ITEM DIALOG */}
+      {/* ITEM DIALOG: hanya dimuat ketika dibuka */}
 
-      <ItemDialog
-        open={dialog.open}
-        onOpenChange={(
-          open,
-        ) =>
-          setDialog(
-            (current) => ({
+      {dialog.open && (
+        <ItemDialog
+          open={dialog.open}
+          onOpenChange={(open) =>
+            setDialog((current) => ({
               open,
-              key: open
-                ? current.key
-                : null,
-            }),
-          )
-        }
-        initial={
-          editing ??
-          EMPTY_ITEM
-        }
-        title={
-          editing
-            ? 'Edit Item'
-            : 'Tambah Item'
-        }
-        onSave={
-          saveItem
-        }
-      />
+              key: open ? current.key : null,
+            }))
+          }
+          initial={editing ?? EMPTY_ITEM}
+          title={editing ? 'Edit Item' : 'Tambah Item'}
+          onSave={saveItem}
+        />
+      )}
 
       {/* DELETE CONFIRMATION */}
 
       <AlertDialog
-        open={
-          deleteKey !== null
-        }
-        onOpenChange={(
-          open,
-        ) => {
-          if (
-            !open &&
-            !saving
-          ) {
-            setDeleteKey(
-              null,
-            )
+        open={deleteKey !== null}
+        onOpenChange={(open) => {
+          if (!open && !saving) {
+            setDeleteKey(null)
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Hapus item ini?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Hapus item ini?</AlertDialogTitle>
 
             <AlertDialogDescription>
-              Item akan dihapus dari
-              daftar penerimaan yang
-              sedang dibuat. Data yang
-              sudah tersimpan di database
-              tidak akan terpengaruh.
+              Item akan dihapus dari daftar penerimaan yang sedang dibuat.
+              Data yang sudah tersimpan di database tidak akan terpengaruh.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>
-              Batal
-            </AlertDialogCancel>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
 
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
-                if (!deleteKey)
-                  return
+                if (!deleteKey) return
 
-                setItems(
-                  (current) =>
-                    current.filter(
-                      (item) =>
-                        item.key !==
-                        deleteKey,
-                    ),
+                setItems((current) =>
+                  current.filter((item) => item.key !== deleteKey),
                 )
 
-                setDeleteKey(
-                  null,
-                )
-
-                toast.success(
-                  'Item dihapus dari daftar',
-                )
+                setDeleteKey(null)
+                toast.success('Item dihapus dari daftar')
               }}
             >
               Hapus Item
@@ -1078,13 +890,9 @@ export function ReturnForm({
 
       <AlertDialog
         open={confirmOpen}
-        onOpenChange={(
-          open,
-        ) => {
+        onOpenChange={(open) => {
           if (!saving) {
-            setConfirmOpen(
-              open,
-            )
+            setConfirmOpen(open)
           }
         }}
       >
@@ -1092,92 +900,56 @@ export function ReturnForm({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="size-5 text-primary" />
-              Simpan penerimaan
-              return?
+              Simpan penerimaan return?
             </AlertDialogTitle>
 
             <AlertDialogDescription>
-              Pastikan informasi header dan
-              seluruh item material sudah
-              sesuai dengan Surat Jalan dan
-              kondisi fisik.
+              Pastikan informasi header dan seluruh item material sudah
+              sesuai dengan Surat Jalan dan kondisi fisik.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl border bg-muted/40 p-4 text-sm">
-
-            <dt className="text-muted-foreground">
-              Tanggal
-            </dt>
-
+            <dt className="text-muted-foreground">Tanggal</dt>
             <dd className="font-medium">
-              {formatDate(
-                header.tanggal_penerimaan,
-              )}
+              {formatDate(header.tanggal_penerimaan)}
             </dd>
 
-            <dt className="text-muted-foreground">
-              Customer
-            </dt>
-
+            <dt className="text-muted-foreground">Customer</dt>
             <dd className="break-words font-medium">
               {header.customer}
             </dd>
 
-            <dt className="text-muted-foreground">
-              Surat Jalan
-            </dt>
-
+            <dt className="text-muted-foreground">Surat Jalan</dt>
             <dd className="break-all font-mono text-xs">
               {header.no_sppb}
             </dd>
 
             {header.no_claim && (
               <>
-                <dt className="text-muted-foreground">
-                  No Claim
-                </dt>
-
+                <dt className="text-muted-foreground">No Claim</dt>
                 <dd className="break-all font-mono text-xs">
                   {header.no_claim}
                 </dd>
               </>
             )}
 
-            <dt className="text-muted-foreground">
-              Jumlah Item
-            </dt>
-
+            <dt className="text-muted-foreground">Jumlah Item</dt>
             <dd className="font-medium tabular-nums">
-              {formatNumber(
-                items.length,
-              )}
+              {formatNumber(items.length)}
             </dd>
 
-            <dt className="text-muted-foreground">
-              Qty SJ
-            </dt>
-
+            <dt className="text-muted-foreground">Qty SJ</dt>
             <dd className="font-medium tabular-nums">
-              {formatNumber(
-                summary.totalSj,
-              )}
+              {formatNumber(summary.totalSj)}
             </dd>
 
-            <dt className="text-muted-foreground">
-              Qty Aktual
-            </dt>
-
+            <dt className="text-muted-foreground">Qty Aktual</dt>
             <dd className="font-medium tabular-nums">
-              {formatNumber(
-                summary.totalAktual,
-              )}
+              {formatNumber(summary.totalAktual)}
             </dd>
 
-            <dt className="text-muted-foreground">
-              Foto
-            </dt>
-
+            <dt className="text-muted-foreground">Foto</dt>
             <dd className="font-medium">
               {header.foto_surat_jalan_url
                 ? 'Surat Jalan ✓'
@@ -1189,34 +961,23 @@ export function ReturnForm({
             </dd>
           </dl>
 
-          {summary.selisihCount >
-            0 && (
+          {summary.selisihCount > 0 && (
             <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
 
               <div>
-                <p className="font-medium">
-                  Terdapat selisih
-                  quantity
-                </p>
+                <p className="font-medium">Terdapat selisih quantity</p>
 
                 <p className="text-muted-foreground">
-                  {formatNumber(
-                    summary.selisihCount,
-                  )}{' '}
-                  item memiliki Qty
-                  Surat Jalan yang
-                  berbeda dengan Qty
-                  Aktual Diterima.
+                  {formatNumber(summary.selisihCount)} item memiliki Qty
+                  Surat Jalan yang berbeda dengan Qty Aktual Diterima.
                 </p>
               </div>
             </div>
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={saving}
-            >
+            <AlertDialogCancel disabled={saving}>
               Periksa Lagi
             </AlertDialogCancel>
 

@@ -1,4 +1,3 @@
-
 'use server'
 
 import { revalidatePath } from 'next/cache'
@@ -8,26 +7,41 @@ import { canEditReturn } from '@/lib/permissions'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
 import { createClient } from '@/lib/supabase/server'
 
-type ActionResult = {
-  ok: boolean
-  error?: string
-}
-
-const ALLOWED_STATUSES = [
-  'Open',
-  'Proses',
+const DISPOSISI_OPTIONS = [
+  'Reject',
+  'Downgrade',
+  'Sortir/Repair',
   'Hold',
-  'Selesai',
 ] as const
 
-function clean(value: FormDataEntryValue | null) {
-  if (typeof value !== 'string') {
-    return null
-  }
+const CLAIM_FIELDS = [
+  'no_claim',
+  'no_claim_2',
+  'no_claim_3',
+  'no_claim_4',
+] as const
 
-  const trimmed = value.trim()
+type ClaimField = (typeof CLAIM_FIELDS)[number]
+type InspectionAdminResult =
+  | { ok: true; warning?: string }
+  | { ok: false; error: string }
 
-  return trimmed.length > 0 ? trimmed : null
+type ReturnAdminRecord = {
+  id: number
+  no_return: string
+  status: string | null
+  no_claim: string | null
+  no_claim_2: string | null
+  no_claim_3: string | null
+  no_claim_4: string | null
+  no_ncr: string | null
+  disposisi: string | null
+}
+
+function cleanText(value: FormDataEntryValue | null): string | null {
+  if (value === null) return null
+  if (typeof value !== 'string') return null
+  return value.trim() || null
 }
 
 function friendlyDbError(message?: string) {
@@ -38,104 +52,87 @@ function friendlyDbError(message?: string) {
     normalized.includes('42501') ||
     normalized.includes('permission denied')
   ) {
-    return 'Anda tidak memiliki akses untuk mengubah data inspeksi.'
+    return 'Anda tidak memiliki akses untuk mengubah administrasi Return.'
+  }
+
+  if (normalized.includes('check constraint')) {
+    return 'Nilai Disposisi tidak sesuai dengan pilihan yang tersedia.'
   }
 
   if (normalized.includes('invalid input syntax')) {
     return 'Format data tidak valid.'
   }
 
-  if (normalized.includes('foreign key')) {
-    return 'Data Return induk tidak ditemukan.'
-  }
-
-  if (
-    normalized.includes('not-null') ||
-    normalized.includes('null value')
-  ) {
-    return 'Ada data wajib yang belum lengkap.'
-  }
-
-  return 'Data inspeksi gagal disimpan. Silakan coba kembali.'
+  return 'Data administrasi Return gagal disimpan. Silakan coba kembali.'
 }
 
-function normalizeForCompare(value: unknown) {
-  if (value === '' || value === undefined) {
-    return null
-  }
-
-  if (
-    typeof value === 'string' &&
-    value.trim() !== '' &&
-    !Number.isNaN(Number(value))
-  ) {
-    return Number(value)
-  }
-
-  return value
-}
-
-function getChangedFields(
-  oldData: Record<string, unknown>,
-  newData: Record<string, unknown>,
-) {
-  const fields = [
-    'status',
-    'progres',
-    'no_ncr',
-    'disposisi',
-    'pic',
-    'tindakan',
-    'target',
-  ]
-
-  return fields.reduce<
-    Record<
-      string,
-      {
-        old: unknown
-        new: unknown
-      }
-    >
-  >((result, field) => {
-    const oldValue = normalizeForCompare(oldData[field])
-    const newValue = normalizeForCompare(newData[field])
-
-    if (oldValue !== newValue) {
-      result[field] = {
-        old: oldValue,
-        new: newValue,
-      }
-    }
-
-    return result
-  }, {})
-}
-
-export async function updateInspectionItemAction(
-  itemId: string,
+function readClaimValue(
   formData: FormData,
-): Promise<ActionResult> {
-  if (!isSupabaseConfigured) {
+  field: ClaimField,
+  oldValue: string | null,
+): { value: string | null; error?: string } {
+  const raw = formData.get(field)
+
+  // Jika field tidak dikirim, jangan menghapus data lama secara tidak sengaja.
+  if (raw === null) return { value: oldValue }
+
+  if (typeof raw !== 'string') {
     return {
-      ok: false,
-      error:
-        'Supabase belum terhubung. Hubungkan integrasi Supabase terlebih dahulu.',
+      value: null,
+      error: `Format ${field.replaceAll('_', ' ')} tidak valid.`,
     }
+  }
+
+  const trimmed = raw.trim()
+  if (!trimmed) return { value: null }
+
+  if (trimmed.length > 50) {
+    return {
+      value: null,
+      error: 'Setiap nomor Claim maksimal 50 karakter.',
+    }
+  }
+
+  // Nilai historis nonangka tetap boleh tersimpan selama tidak diubah.
+  const previous = oldValue ?? ''
+  if (trimmed === previous.trim() && !/^\d+$/.test(trimmed)) {
+    return { value: previous }
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    return {
+      value: null,
+      error: 'No Claim baru hanya boleh berisi angka tanpa suffix atau pemisah.',
+    }
+  }
+
+  return { value: trimmed }
+}
+
+export async function updateInspectionAdminAction(
+  returnId: string,
+  formData: FormData,
+): Promise<InspectionAdminResult> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, error: 'Supabase belum terhubung.' }
+  }
+
+  if (!/^\d+$/.test(returnId)) {
+    return { ok: false, error: 'ID Return tidak valid.' }
+  }
+
+  const numericId = Number(returnId)
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) {
+    return { ok: false, error: 'ID Return tidak valid.' }
   }
 
   try {
-    // 1. Verifikasi pengguna
     const user = await getCurrentUser()
 
     if (!user) {
-      return {
-        ok: false,
-        error: 'Sesi berakhir. Silakan login kembali.',
-      }
+      return { ok: false, error: 'Sesi berakhir. Silakan login kembali.' }
     }
 
-    // 2. Tolak akun yang belum aktif
     if (user.status !== 'active') {
       return {
         ok: false,
@@ -143,233 +140,191 @@ export async function updateInspectionItemAction(
       }
     }
 
-    // 3. Periksa izin role
     if (!canEditReturn(user.role)) {
       return {
         ok: false,
-        error:
-          'Anda tidak memiliki akses untuk mengubah data inspeksi.',
+        error: 'Anda tidak memiliki akses untuk mengubah administrasi Return.',
       }
-    }
-
-    // 4. Validasi ID
-    const numericId = Number(itemId)
-
-    if (!Number.isInteger(numericId) || numericId <= 0) {
-      return {
-        ok: false,
-        error: 'ID item inspeksi tidak valid.',
-      }
-    }
-
-    // 5. Validasi status
-    const rawStatus = clean(formData.get('status'))
-    const status = rawStatus ?? 'Open'
-
-    if (
-      !ALLOWED_STATUSES.some(
-        (allowedStatus) => allowedStatus === status,
-      )
-    ) {
-      return {
-        ok: false,
-        error: 'Status inspeksi tidak valid.',
-      }
-    }
-
-    // 6. Validasi progres
-    const progresRaw = clean(formData.get('progres'))
-    const progres = progresRaw === null ? 0 : Number(progresRaw)
-
-    if (
-      !Number.isInteger(progres) ||
-      progres < 0 ||
-      progres > 100 ||
-      progres % 5 !== 0
-    ) {
-      return {
-        ok: false,
-        error:
-          'Progres harus berupa angka kelipatan 5 antara 0 sampai 100%.',
-      }
-    }
-
-    // 7. Siapkan data yang diperbolehkan untuk diperbarui
-    const nextData = {
-      status,
-      progres,
-      no_ncr: clean(formData.get('no_ncr')),
-      disposisi: clean(formData.get('disposisi')),
-      pic: clean(formData.get('pic')),
-      tindakan: clean(formData.get('tindakan')),
-      target: clean(formData.get('target')),
     }
 
     const supabase = await createClient()
 
-    // 8. Ambil data lama
-    const oldResult = await supabase
-      .from('return_items')
+    const { data: rawOldData, error: oldError } = await supabase
+      .from('return_headers')
       .select(
-        'id, return_header_id, status, progres, no_ncr, disposisi, pic, tindakan, target',
+        'id, no_return, status, no_claim, no_claim_2, no_claim_3, no_claim_4, no_ncr, disposisi',
       )
       .eq('id', numericId)
       .maybeSingle()
 
-    if (oldResult.error) {
-      console.error(
-        '[updateInspectionItemAction] old data:',
-        oldResult.error.message,
-      )
-
-      return {
-        ok: false,
-        error: friendlyDbError(oldResult.error.message),
-      }
+    if (oldError) {
+      console.error('[updateInspectionAdminAction] old data:', oldError.message)
+      return { ok: false, error: friendlyDbError(oldError.message) }
     }
 
-    const oldData = oldResult.data
+    const oldData = rawOldData as unknown as ReturnAdminRecord | null
 
     if (!oldData) {
+      return { ok: false, error: 'Data Return tidak ditemukan.' }
+    }
+
+    if (oldData.status === 'dibatalkan') {
       return {
         ok: false,
-        error: 'Data material inspeksi tidak ditemukan.',
+        error: 'Return yang sudah dibatalkan tidak dapat diedit.',
       }
     }
 
-    // 9. Pastikan Return induk tersedia dan tidak dibatalkan
-    const parentResult = await supabase
+    const oldClaims: Record<ClaimField, string | null> = {
+      no_claim: oldData.no_claim,
+      no_claim_2: oldData.no_claim_2,
+      no_claim_3: oldData.no_claim_3,
+      no_claim_4: oldData.no_claim_4,
+    }
+
+    const nextClaims = {} as Record<ClaimField, string | null>
+
+    for (const field of CLAIM_FIELDS) {
+      const parsed = readClaimValue(formData, field, oldClaims[field])
+      if (parsed.error) return { ok: false, error: parsed.error }
+      nextClaims[field] = parsed.value
+    }
+
+    // Claim harus berurutan: Claim 2 tidak boleh terisi sebelum Claim 1, dst.
+    for (let index = 1; index < CLAIM_FIELDS.length; index += 1) {
+      const currentField = CLAIM_FIELDS[index]
+      const previousField = CLAIM_FIELDS[index - 1]
+
+      if (nextClaims[currentField] && !nextClaims[previousField]) {
+        return {
+          ok: false,
+          error: `Isi ${previousField.replaceAll('_', ' ')} sebelum ${currentField.replaceAll('_', ' ')}.`,
+        }
+      }
+    }
+
+    const rawNoNcr = formData.get('no_ncr')
+    if (rawNoNcr !== null && typeof rawNoNcr !== 'string') {
+      return { ok: false, error: 'Format No NCR tidak valid.' }
+    }
+    const noNcr = rawNoNcr === null ? oldData.no_ncr : cleanText(rawNoNcr)
+
+    if ((noNcr ?? '').length > 100) {
+      return { ok: false, error: 'No NCR maksimal 100 karakter.' }
+    }
+
+    const rawDisposisi = formData.get('disposisi')
+    if (rawDisposisi !== null && typeof rawDisposisi !== 'string') {
+      return { ok: false, error: 'Format Disposisi tidak valid.' }
+    }
+    const disposisi =
+      rawDisposisi === null ? oldData.disposisi : cleanText(rawDisposisi)
+
+    if (
+      disposisi &&
+      !DISPOSISI_OPTIONS.some((option) => option === disposisi)
+    ) {
+      return {
+        ok: false,
+        error: 'Disposisi tidak valid. Pilih salah satu opsi yang tersedia.',
+      }
+    }
+
+    const nextData: Record<string, string | null> = {
+      ...nextClaims,
+      no_ncr: noNcr,
+      disposisi,
+    }
+
+    const fields = [...CLAIM_FIELDS, 'no_ncr', 'disposisi'] as const
+    const oldRecord: Record<string, unknown> = {
+      no_claim: oldData.no_claim,
+      no_claim_2: oldData.no_claim_2,
+      no_claim_3: oldData.no_claim_3,
+      no_claim_4: oldData.no_claim_4,
+      no_ncr: oldData.no_ncr,
+      disposisi: oldData.disposisi,
+    }
+
+    const changedFields: Record<string, { old: unknown; new: unknown }> = {}
+
+    for (const field of fields) {
+      const oldValue = oldRecord[field] ?? null
+      const newValue = nextData[field] ?? null
+
+      if (oldValue !== newValue) {
+        changedFields[field] = { old: oldValue, new: newValue }
+      }
+    }
+
+    const changedKeys = Object.keys(changedFields)
+    if (changedKeys.length === 0) return { ok: true }
+
+    const { data: rawUpdated, error: updateError } = await supabase
       .from('return_headers')
-      .select('id, status')
-      .eq('id', oldData.return_header_id)
+      .update(({
+        ...nextData,
+        updated_at: new Date().toISOString(),
+      }) as never)
+      .eq('id', numericId)
+      .neq('status', 'dibatalkan')
+      .select('id')
       .maybeSingle()
 
-    if (parentResult.error) {
-      console.error(
-        '[updateInspectionItemAction] parent:',
-        parentResult.error.message,
-      )
-
-      return {
-        ok: false,
-        error: friendlyDbError(parentResult.error.message),
-      }
+    if (updateError) {
+      console.error('[updateInspectionAdminAction] update:', updateError.message)
+      return { ok: false, error: friendlyDbError(updateError.message) }
     }
 
-    const parent = parentResult.data
-
-    if (!parent) {
-      return {
-        ok: false,
-        error: 'Data Return induk tidak ditemukan.',
-      }
-    }
-
-    if (parent.status === 'dibatalkan') {
+    const updated = rawUpdated as unknown as { id: number } | null
+    if (!updated) {
       return {
         ok: false,
         error:
-          'Material dari Return yang sudah dibatalkan tidak dapat diedit.',
+          'Data tidak diperbarui. Return mungkin sudah dibatalkan atau akses Anda berubah.',
       }
     }
 
-    // 10. Periksa perubahan
-    const changedFields = getChangedFields(
-      oldData,
-      nextData,
-    )
+    const oldHistory: Record<string, unknown> = {}
+    const newHistory: Record<string, unknown> = {}
 
-    if (Object.keys(changedFields).length === 0) {
-      return {
-        ok: true,
-      }
+    for (const field of changedKeys) {
+      oldHistory[field] = oldRecord[field] ?? null
+      newHistory[field] = nextData[field] ?? null
     }
 
-    // 11. Simpan pembaruan inspeksi
-    const updateResult = await supabase
-      .from('return_items')
-      .update(nextData)
-      .eq('id', numericId)
-      .select('id')
-
-    if (updateResult.error) {
-      console.error(
-        '[updateInspectionItemAction] update:',
-        updateResult.error.message,
-      )
-
-      return {
-        ok: false,
-        error: friendlyDbError(updateResult.error.message),
-      }
-    }
-
-    if (!updateResult.data?.length) {
-      return {
-        ok: false,
-        error:
-          'Data tidak diperbarui. Periksa kembali izin akses dan data inspeksi.',
-      }
-    }
-
-    // 12. Catat riwayat perubahan
-    const historyResult = await supabase
+    const { error: historyError } = await supabase
       .from('return_history')
       .insert({
-        return_header_id: oldData.return_header_id,
+        return_header_id: numericId,
         user_id: user.id,
-        action: 'UPDATE_ITEM',
-        module: 'ITEM',
-        old_data: {
-          status: oldData.status,
-          progres: oldData.progres,
-          no_ncr: oldData.no_ncr,
-          disposisi: oldData.disposisi,
-          pic: oldData.pic,
-          tindakan: oldData.tindakan,
-          target: oldData.target,
-        },
-        new_data: nextData,
+        action: 'UPDATE_HEADER',
+        module: 'RETURN',
+        old_data: oldHistory,
+        new_data: newHistory,
         changed_fields: changedFields,
-        notes: 'Data inspeksi material diperbarui',
+        notes: 'Administrasi Return diperbarui melalui Monitoring Progres Return',
       })
 
-    if (historyResult.error) {
-      // Data sudah berubah, tetapi riwayat gagal disimpan.
-      // Catat kegagalan agar dapat diperiksa administrator.
-      console.error(
-        '[updateInspectionItemAction] history:',
-        historyResult.error.message,
-      )
+    revalidatePath('/inspection')
+    revalidatePath(`/returns/${numericId}`)
+    revalidatePath('/history')
 
+    if (historyError) {
+      console.error('[updateInspectionAdminAction] history:', historyError.message)
       return {
-        ok: false,
-        error:
-          'Data inspeksi sudah diperbarui, tetapi riwayat perubahan gagal disimpan. Hubungi administrator sebelum mengulangi proses.',
+        ok: true,
+        warning:
+          'Data administrasi berhasil disimpan, tetapi riwayat perubahan gagal dicatat. Hubungi administrator.',
       }
     }
 
-    // 13. Perbarui cache halaman terkait
-    revalidatePath('/inspection')
-    revalidatePath(`/inspection/${numericId}`)
-    revalidatePath(`/returns/${oldData.return_header_id}`)
-    revalidatePath('/returns')
-    revalidatePath('/dashboard')
-    revalidatePath('/history')
-    revalidatePath('/', 'layout')
-
-    return {
-      ok: true,
-    }
+    return { ok: true }
   } catch (error) {
-    console.error(
-      '[updateInspectionItemAction]',
-      error,
-    )
-
+    console.error('[updateInspectionAdminAction]', error)
     return {
       ok: false,
-      error: 'Terjadi kesalahan saat menyimpan inspeksi.',
+      error: 'Terjadi kesalahan saat menyimpan administrasi Return.',
     }
   }
 }

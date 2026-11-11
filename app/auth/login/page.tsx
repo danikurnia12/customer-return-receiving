@@ -1,8 +1,10 @@
+
 'use client'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+
 import {
   ArrowRight,
   Factory,
@@ -28,6 +30,8 @@ export default function LoginPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (loading) return
 
     if (!isSupabaseConfigured) {
       setError('Supabase belum terhubung.')
@@ -90,228 +94,237 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen w-full bg-slate-100 dark:bg-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1600px] items-center justify-center p-0 sm:p-4 lg:p-6">
-        <div className="flex min-h-screen w-full overflow-hidden border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 sm:min-h-[calc(100vh-2rem)] sm:rounded-2xl lg:min-h-[calc(100vh-3rem)]">
+    <main className="min-h-dvh w-full overflow-x-hidden bg-slate-100 dark:bg-slate-950 lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+      <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] items-center justify-center p-0 sm:p-3 lg:h-full lg:min-h-0 lg:p-4">
+        <div className="grid min-h-dvh w-full grid-cols-1 overflow-hidden border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950 sm:min-h-[calc(100dvh-1.5rem)] sm:rounded-2xl lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)]">
 
           {/* =====================================================
-              PANEL KIRI — BRANDING SPINDO
-          ====================================================== */}
-          <section className="relative hidden w-[52%] overflow-hidden bg-[#061A33] lg:flex">
+              DESKTOP BRANDING PANEL
+          ===================================================== */}
 
-            {/* Background decoration */}
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute -right-32 -top-32 h-[500px] w-[500px] rounded-full border-[60px] border-white/[0.035]" />
+          <section className="relative hidden min-h-0 overflow-hidden bg-[#071A32] lg:flex">
 
-              <div className="absolute -bottom-48 -left-48 h-[650px] w-[650px] rounded-full border-[80px] border-white/[0.035]" />
+            {/* BACKGROUND */}
 
-              <div className="absolute right-0 top-0 h-full w-2/3 bg-gradient-to-l from-[#002B66]/80 via-[#002B66]/20 to-transparent" />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+            >
+              <div className="absolute -right-36 -top-40 size-[520px] rounded-full border-[65px] border-white/[0.035]" />
+
+              <div className="absolute -bottom-56 -left-48 size-[620px] rounded-full border-[75px] border-white/[0.035]" />
+
+              <div className="absolute right-0 top-0 h-full w-2/3 bg-gradient-to-l from-[#002B66]/70 via-[#002B66]/20 to-transparent" />
 
               <div className="absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r from-[#E31E24] via-[#E31E24]/60 to-transparent" />
             </div>
 
-            <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14 2xl:p-16">
+            <div className="relative z-10 flex h-full w-full flex-col justify-between gap-[clamp(0.75rem,2vh,1.5rem)] p-[clamp(1.25rem,3vh,2.75rem)]">
 
-              {/* Logo */}
-              <div>
-                <div className="inline-flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-4 backdrop-blur-md">
+              {/* BRAND */}
 
-                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white p-2 shadow-xl">
-                    <img
-                      src="/spindo 5.png"
-                      alt="SPINDO 5"
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-lg xl:size-12">
+                  <img
+                    src="/spindo 5.png"
+                    alt="SPINDO 5"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
 
-                  <div>
-                    <p className="text-base font-bold tracking-wide text-white">
-                      PT Steel Pipe Industry Of Indonesia Tbk
-                    </p>
-
-                    <p className="mt-0.5 text-sm text-slate-300">
-                      SPINDO 5 • Warehouse
-                    </p>
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold tracking-wide text-white xl:text-base">
+                    PT Steel Pipe Industry Of Indonesia Tbk
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-semibold tracking-[0.16em] text-slate-300">
+                    SPINDO 5 · WAREHOUSE
+                  </p>
                 </div>
               </div>
 
-              {/* Main content */}
-              <div className="max-w-2xl">
+              {/* MAIN BRANDING */}
 
-                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-red-400/20 bg-red-500/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-red-300">
-                  <Factory className="h-4 w-4" />
-                  Warehouse Return Management
+              <div className="my-auto max-w-xl">
+                <div className="mb-[clamp(0.5rem,1.5vh,1.25rem)] inline-flex items-center gap-2 rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-red-300">
+                  <Factory className="size-3.5" />
+                  Internal Operational System
                 </div>
 
-                <h1 className="text-5xl font-bold leading-[1.08] tracking-tight text-white xl:text-6xl 2xl:text-7xl">
-                  Monitoring
+                <h1 className="text-[clamp(2rem,4.2vw,3.75rem)] font-bold leading-[1.08] tracking-tight text-white">
+                  Customer
                   <span className="block text-slate-300">
-                    Return Customer
+                    Return
+                  </span>
+
+                  <span className="mt-1 block text-[clamp(1.2rem,2.4vw,2rem)] font-semibold text-red-400">
+                    Receiving & Monitoring
                   </span>
                 </h1>
 
-                <p className="mt-7 max-w-xl text-base leading-7 text-slate-300 xl:text-lg">
-                  Sistem terintegrasi untuk mencatat,
-                  memonitor, dan menelusuri proses
-                  penerimaan material return secara
-                  terstruktur, akurat, dan terdokumentasi.
+                <p className="mt-[clamp(0.75rem,2vh,1.5rem)] max-w-lg text-sm leading-6 text-slate-300 xl:text-base xl:leading-7">
+                  Sistem terintegrasi untuk mencatat, memonitor,
+                  dan menelusuri proses penerimaan material Return
+                  secara terstruktur, akurat, dan terdokumentasi.
                 </p>
 
-                {/* Feature cards */}
-                <div className="mt-10 grid max-w-2xl grid-cols-3 gap-4">
+                {/* FEATURE CARDS */}
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-5 backdrop-blur-sm">
-                    <ShieldCheck className="h-6 w-6 text-red-400" />
+                <div className="mt-[clamp(1rem,2.5vh,2rem)] grid grid-cols-3 gap-2.5 xl:gap-3 [@media(max-height:680px)]:hidden">
 
-                    <p className="mt-4 text-sm font-bold text-white">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3 backdrop-blur-sm xl:p-4">
+                    <ShieldCheck className="size-5 text-red-400" />
+
+                    <p className="mt-3 text-xs font-bold text-white xl:text-sm">
                       Secure
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Akses berbasis role
+                    <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                      Role-based access
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-5 backdrop-blur-sm">
-                    <Factory className="h-6 w-6 text-red-400" />
+                  <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3 backdrop-blur-sm xl:p-4">
+                    <Factory className="size-5 text-red-400" />
 
-                    <p className="mt-4 text-sm font-bold text-white">
-                      Warehouse
+                    <p className="mt-3 text-xs font-bold text-white xl:text-sm">
+                      Monitoring
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Monitoring operasional
+                    <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                      Warehouse activity
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-5 backdrop-blur-sm">
-                    <LockKeyhole className="h-6 w-6 text-red-400" />
+                  <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3 backdrop-blur-sm xl:p-4">
+                    <LockKeyhole className="size-5 text-red-400" />
 
-                    <p className="mt-4 text-sm font-bold text-white">
+                    <p className="mt-3 text-xs font-bold text-white xl:text-sm">
                       Audited
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Riwayat aktivitas
+                    <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                      Activity history
                     </p>
                   </div>
 
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between border-t border-white/10 pt-5 text-xs text-slate-500">
+              {/* DESKTOP FOOTER */}
+
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 pt-3 text-[10px] text-slate-500 [@media(max-height:600px)]:hidden">
                 <span>
                   Internal Operational System
                 </span>
 
-                <span>
-                  Architected By : Dani Kurnia
+                <span className="text-right">
+                  Architected By: Dani Kurnia
                 </span>
               </div>
             </div>
           </section>
 
           {/* =====================================================
-              PANEL KANAN — LOGIN
-          ====================================================== */}
-          <section className="flex flex-1 items-center justify-center bg-slate-50 px-6 py-10 dark:bg-slate-950 sm:px-10 lg:px-12 xl:px-20">
+              LOGIN PANEL
+          ===================================================== */}
 
-            <div className="w-full max-w-lg">
+          <section className="flex min-h-dvh min-w-0 items-center justify-center bg-slate-50 px-[clamp(1rem,3vw,3rem)] py-[clamp(0.75rem,2vh,1.5rem)] dark:bg-slate-950 lg:h-full lg:min-h-0 lg:overflow-y-auto">
 
-              {/* Mobile branding */}
-              <div className="mb-10 flex items-center gap-4 lg:hidden">
+            <div className="w-full max-w-[410px] py-2 lg:py-[clamp(0.5rem,1.5vh,1.25rem)]">
 
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white p-2 shadow-md">
+              {/* MOBILE BRANDING */}
+
+              <div className="mb-4 flex items-center gap-3 lg:hidden [@media(max-height:560px)]:mb-2">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm">
                   <img
                     src="/spindo 5.png"
-                    alt="SPINDO Unit 5"
+                    alt="SPINDO 5"
                     className="h-full w-full object-contain"
                   />
                 </div>
 
-                <div>
-                  <p className="text-base font-bold text-slate-900 dark:text-white">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold leading-5 text-slate-900 dark:text-white sm:text-sm">
                     PT Steel Pipe Industry Of Indonesia Tbk
                   </p>
 
-                  <p className="text-sm text-slate-500">
-                    SPINDO 5 • Warehouse
+                  <p className="mt-0.5 text-[10px] font-semibold tracking-[0.14em] text-slate-500">
+                    SPINDO 5 · WAREHOUSE
                   </p>
                 </div>
               </div>
 
-              {/* Login header */}
-              <div className="mb-9">
+              {/* LOGIN HEADING */}
 
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#061A33] text-white shadow-lg">
-                  <LockKeyhole className="h-6 w-6" />
+              <div className="mb-5 sm:mb-6 [@media(max-height:650px)]:mb-3">
+                <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-[#071A32] text-white shadow-md sm:size-11">
+                  <LockKeyhole className="size-5" />
                 </div>
 
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#E31E24]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E31E24]">
                   Internal System
                 </p>
 
-                <h2 className="mt-3 text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
+                <h2 className="mt-1.5 text-[clamp(1.5rem,4vh,2.25rem)] font-bold tracking-tight text-slate-900 dark:text-white">
                   Selamat Datang
                 </h2>
 
-                <p className="mt-3 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Masuk untuk mengakses sistem
-                  Monitoring Return Customer.
+                <p className="mt-1.5 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
+                  Masuk menggunakan akun terdaftar untuk mengakses
+                  sistem Monitoring Return Customer.
                 </p>
               </div>
 
-              {/* Login form */}
+              {/* LOGIN FORM */}
+
               <form
                 onSubmit={submit}
-                className="space-y-6"
+                className="space-y-3 sm:space-y-4"
               >
 
-                {/* Email */}
-                <div className="space-y-2.5">
+                {/* EMAIL */}
 
+                <div className="space-y-1.5">
                   <Label
                     htmlFor="email"
-                    className="text-sm font-semibold text-slate-700 dark:text-slate-300"
+                    className="text-xs font-semibold text-slate-700 dark:text-slate-300 sm:text-sm"
                   >
                     Email
                   </Label>
 
                   <div className="relative">
-
-                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
 
                     <Input
                       id="email"
                       type="email"
                       autoComplete="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       required
                       value={email}
                       onChange={(e) =>
                         setEmail(e.target.value)
                       }
                       placeholder="nama@perusahaan.com"
-                      className="h-14 rounded-xl border-slate-200 bg-white pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-[#002B66] focus:ring-4 focus:ring-[#002B66]/10 dark:border-slate-800 dark:bg-slate-900"
+                      disabled={loading}
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus-visible:border-[#002B66] focus-visible:ring-4 focus-visible:ring-[#002B66]/10 dark:border-slate-800 dark:bg-slate-900 sm:h-12"
                     />
-
                   </div>
                 </div>
 
-                {/* Password */}
-                <div className="space-y-2.5">
+                {/* PASSWORD */}
 
+                <div className="space-y-1.5">
                   <Label
                     htmlFor="password"
-                    className="text-sm font-semibold text-slate-700 dark:text-slate-300"
+                    className="text-xs font-semibold text-slate-700 dark:text-slate-300 sm:text-sm"
                   >
                     Password
                   </Label>
 
                   <div className="relative">
-
-                    <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400" />
 
                     <Input
                       id="password"
@@ -323,51 +336,55 @@ export default function LoginPage() {
                         setPassword(e.target.value)
                       }
                       placeholder="Masukkan password"
-                      className="h-14 rounded-xl border-slate-200 bg-white pl-12 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus:border-[#002B66] focus:ring-4 focus:ring-[#002B66]/10 dark:border-slate-800 dark:bg-slate-900"
+                      disabled={loading}
+                      className="h-11 rounded-xl border-slate-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all placeholder:text-slate-400 focus-visible:border-[#002B66] focus-visible:ring-4 focus-visible:ring-[#002B66]/10 dark:border-slate-800 dark:bg-slate-900 sm:h-12"
                     />
-
                   </div>
                 </div>
 
-                {/* Error */}
+                {/* ERROR */}
+
                 {error && (
                   <div
                     role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+                    className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
                   >
-                    <p className="font-semibold">
+                    <p className="text-xs font-semibold">
                       Login tidak berhasil
                     </p>
 
-                    <p className="mt-1 text-xs leading-5">
+                    <p className="mt-1 break-words text-[11px] leading-5">
                       {error}
                     </p>
                   </div>
                 )}
 
-                {/* Submit */}
+                {/* SUBMIT */}
+
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="group h-14 w-full rounded-xl bg-[#061A33] text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition-all hover:bg-[#002B66] hover:shadow-xl hover:shadow-[#002B66]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-busy={loading}
+                  className="group mt-1 h-11 w-full rounded-xl bg-[#071A32] text-sm font-bold text-white shadow-md shadow-slate-900/10 transition-all duration-200 hover:bg-[#002B66] hover:shadow-lg hover:shadow-[#002B66]/20 disabled:cursor-not-allowed disabled:opacity-60 sm:h-12"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <Loader2 className="size-4 animate-spin" />
                       Memproses login...
                     </>
                   ) : (
                     <>
                       Masuk ke Sistem
-                      <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
+
+                      <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" />
                     </>
                   )}
                 </Button>
 
-                {/* Register */}
-                <div className="pt-1 text-center">
+                {/* REGISTER */}
 
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="pt-1 text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
                     Belum punya akun?{' '}
 
                     <Link
@@ -377,39 +394,32 @@ export default function LoginPage() {
                       Daftar akun
                     </Link>
                   </p>
-
                 </div>
               </form>
 
-              {/* Security */}
-              <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              {/* SECURITY */}
 
-                <div className="flex items-start gap-3">
+              <div className="mt-4 flex items-start gap-3 border-t border-slate-200 pt-3 dark:border-slate-800 [@media(max-height:560px)]:hidden">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+                  <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
 
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
-                    <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                    Akses Sistem Terlindungi
+                  </p>
 
-                  <div>
-                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                      Akses Sistem Terlindungi
-                    </p>
-
-                    <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                      Gunakan akun yang telah terdaftar
-                      dan jangan membagikan password
-                      kepada pengguna lain.
-                    </p>
-                  </div>
-
+                  <p className="mt-0.5 text-[10px] leading-5 text-slate-500 dark:text-slate-400">
+                    Gunakan akun yang telah terdaftar dan
+                    jangan membagikan password kepada pengguna lain.
+                  </p>
                 </div>
               </div>
 
-              {/* Footer */}
-              <p className="mt-7 text-center text-[11px] text-slate-400">
-                Monitoring Return Customer
-                {' • '}
-                 SPINDO 5
+              {/* FOOTER */}
+
+              <p className="mt-4 text-center text-[10px] text-slate-400 [@media(max-height:560px)]:mt-2">
+                SPINDO 5 · Customer Return Receiving
               </p>
 
             </div>

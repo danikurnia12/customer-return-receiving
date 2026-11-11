@@ -224,17 +224,16 @@ export function ReturnDetailView({
   }
 
   const confirmDelete = async () => {
-    if (!deleteId) return
+  if (!deleteId) return
 
-    setBusy(true)
+  setBusy(true)
 
-    const res =
-      await deleteReturnItemAction(deleteId)
-
-    setBusy(false)
+  try {
+    const res = await deleteReturnItemAction(deleteId)
 
     if (!res.ok) {
-      return toast.error(res.error)
+      toast.error(res.error)
+      return
     }
 
     toast.success('Item dihapus')
@@ -242,36 +241,56 @@ export function ReturnDetailView({
     setDeleteId(null)
 
     router.refresh()
+  } catch (error) {
+    console.error('[confirmDelete]', error)
+
+    toast.error(
+      'Terjadi kesalahan saat menghapus item.',
+    )
+  } finally {
+    setBusy(false)
   }
+}
+
 
   const confirmCancel = async () => {
-    if (!reason.trim()) {
-      return toast.error(
-        'Alasan pembatalan wajib diisi',
-      )
+    const cancelReason = reason.trim()
+
+    if (!cancelReason) {
+      toast.error('Alasan pembatalan wajib diisi.')
+      return
     }
 
     setBusy(true)
 
-    const res =
-      await cancelReturnAction(
+    try {
+      const res = await cancelReturnAction(
         header.id,
-        reason,
+        cancelReason,
       )
 
-    setBusy(false)
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
 
-    if (!res.ok) {
-      return toast.error(res.error)
+      toast.success('Return berhasil dibatalkan')
+
+      setCancelOpen(false)
+      setReason('')
+
+      router.refresh()
+    } catch (error) {
+      console.error('[confirmCancel]', error)
+
+      toast.error(
+        'Terjadi kesalahan saat membatalkan Return.',
+      )
+    } finally {
+      setBusy(false)
     }
-
-    toast.success('Return dibatalkan')
-
-    setCancelOpen(false)
-    setReason('')
-
-    router.refresh()
   }
+
 
   const confirmPermanentDelete = async () => {
     if (deleteConfirmation.trim() !== header.no_return) {
@@ -660,7 +679,7 @@ export function ReturnDetailView({
         <CardContent className="p-0">
           <ItemsTable
             rows={items.map((i) => ({
-              key: i.id,
+              key: String(i.id),
               diameter: i.diameter ?? '',
               tebal: i.tebal ?? '',
               panjang: i.panjang ?? '',
@@ -681,10 +700,10 @@ export function ReturnDetailView({
                 : undefined
             }
             onDelete={
-              editable && items.length > 1
-                ? setDeleteId
-                : undefined
-            }
+  canDelete && editable && items.length > 1
+    ? (id) => setDeleteId(String(id))
+    : undefined
+}
           />
         </CardContent>
       </Card>

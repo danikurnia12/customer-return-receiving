@@ -6,13 +6,27 @@ import {
   useRouter,
   useSearchParams,
 } from 'next/navigation'
-import { useState, useTransition } from 'react'
-import { Loader2, RotateCcw, Search } from 'lucide-react'
+
+import {
+  useEffect,
+  useState,
+  useTransition,
+  type FormEvent,
+} from 'react'
+
+import {
+  Loader2,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react'
 
 import { STATUS_OPTIONS } from '@/components/app/badges'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+
 import {
   Select,
   SelectContent,
@@ -23,37 +37,67 @@ import {
 
 const ALL = '__all__'
 
+type FilterBarProps = {
+  customers?: string[]
+  showSearch?: boolean
+  showCustomer?: boolean
+  showStatus?: boolean
+  searchPlaceholder?: string
+  popup?: boolean
+}
+
 export function FilterBar({
   customers,
   showSearch = false,
   showCustomer = true,
   showStatus = true,
   searchPlaceholder = 'Cari No Return, Surat Jalan, Claim, Customer',
-}: {
-  customers?: string[]
-  showSearch?: boolean
-  showCustomer?: boolean
-  showStatus?: boolean
-  searchPlaceholder?: string
-}) {
+  popup = false,
+}: FilterBarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
 
   const [pending, startTransition] = useTransition()
+  const [open, setOpen] = useState(false)
 
   const [q, setQ] = useState(params.get('q') ?? '')
   const [from, setFrom] = useState(params.get('from') ?? '')
   const [to, setTo] = useState(params.get('to') ?? '')
+
   const [customer, setCustomer] = useState(
     params.get('customer') ?? ALL,
   )
+
   const [status, setStatus] = useState(
     params.get('status') ?? ALL,
   )
 
+  useEffect(() => {
+    if (!open || !popup) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open, popup])
+
   const apply = () => {
-    const values = { q, from, to, customer, status }
+    const values = {
+      q,
+      from,
+      to,
+      customer,
+      status,
+    }
+
     const next = new URLSearchParams()
 
     for (const [key, value] of Object.entries(values)) {
@@ -67,6 +111,8 @@ export function FilterBar({
         next.toString() ? `${pathname}?${next}` : pathname,
       )
     })
+
+    setOpen(false)
   }
 
   const reset = () => {
@@ -79,6 +125,13 @@ export function FilterBar({
     startTransition(() => {
       router.push(pathname)
     })
+
+    setOpen(false)
+  }
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    apply()
   }
 
   const customerItems = [
@@ -94,18 +147,20 @@ export function FilterBar({
     ...STATUS_OPTIONS,
   ]
 
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        apply()
-      }}
-      className="
-        grid grid-cols-2 items-end gap-2
-        rounded-md border bg-card p-3
-        sm:flex sm:flex-wrap sm:gap-2
-      "
-    >
+  const activeFilterCount = [
+    showSearch && Boolean(q.trim()),
+    Boolean(from),
+    Boolean(to),
+    showCustomer && customer !== ALL,
+    showStatus && status !== ALL,
+  ].filter(Boolean).length
+
+  /* ==========================================================
+     FIELD FILTER
+     ========================================================== */
+
+  const filterFields = (
+    <>
       {showSearch && (
         <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1 sm:min-w-[220px] sm:flex-1">
           <Label
@@ -136,6 +191,7 @@ export function FilterBar({
         >
           Dari
         </Label>
+
         <Input
           id="filter-from"
           type="date"
@@ -152,6 +208,7 @@ export function FilterBar({
         >
           Sampai
         </Label>
+
         <Input
           id="filter-to"
           type="date"
@@ -231,7 +288,11 @@ export function FilterBar({
           </Select>
         </div>
       )}
+    </>
+  )
 
+  const filterActions = (
+    <>
       <Button
         type="submit"
         disabled={pending}
@@ -255,6 +316,94 @@ export function FilterBar({
         <RotateCcw className="size-4" />
         Reset
       </Button>
+    </>
+  )
+
+  /* ==========================================================
+     POPUP MODE
+     ========================================================== */
+
+  if (popup) {
+    return (
+      <div className="relative flex w-full justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setOpen((value) => !value)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          className="h-10 gap-2"
+        >
+          <SlidersHorizontal className="size-4" />
+
+          Filter
+
+          {activeFilterCount > 0 && (
+            <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+              {activeFilterCount}
+            </span>
+          )}
+        </Button>
+
+        {open && (
+          <div
+            role="dialog"
+            aria-label="Filter Monitoring"
+            className="absolute right-0 top-full z-50 mt-2 w-[min(42rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl"
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold">
+                  Filter Monitoring
+                </h3>
+
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Atur periode, customer, dan status Return.
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+                aria-label="Tutup filter"
+                className="size-8 shrink-0 p-0"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+              <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-3">
+                {filterFields}
+              </div>
+
+              <div className="mt-4 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+                {filterActions}
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  /* ==========================================================
+     DEFAULT MODE
+     Dipertahankan untuk halaman lain yang menggunakan FilterBar.
+     ========================================================== */
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="
+        grid grid-cols-2 items-end gap-2
+        rounded-md border bg-card p-3
+        sm:flex sm:flex-wrap sm:gap-2
+      "
+    >
+      {filterFields}
+      {filterActions}
     </form>
   )
 }

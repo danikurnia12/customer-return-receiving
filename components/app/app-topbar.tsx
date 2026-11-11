@@ -6,6 +6,7 @@ import { Fragment, useState } from 'react'
 import {
   Camera,
   CheckCircle2,
+  ChevronDown,
   LogOut,
   Moon,
   Sun,
@@ -44,10 +45,10 @@ import type { AppUser } from '@/lib/types'
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: 'Dashboard Return',
-  ai: 'AI Insight',
   returns: 'Return Items',
   new: 'Penerimaan Baru',
   history: 'Return History',
+  inspection: 'Progres Administrasi',
   settings: 'Pengaturan',
   users: 'Users',
   help: 'Bantuan',
@@ -422,21 +423,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
                   : 'Belum terhubung'}
               </span>
             </span>
-
-            {/* CHEVRON */}
-
-            <span
-              className="
-                hidden
-                text-muted-foreground
-                transition-transform
-                duration-200
-                group-data-[state=open]:rotate-180
-                md:block
-              "
-            >
-              ▾
-            </span>
+            <ChevronDown className="hidden size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 md:block" />
           </DropdownMenuTrigger>
 
           {/* ACCOUNT DROPDOWN */}

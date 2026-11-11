@@ -1,11 +1,14 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ImagePlus, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
+
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+
 import {
+  compressReturnPhoto,
   uploadReturnPhoto,
   deleteReturnPhoto,
   validatePhoto,
@@ -30,53 +33,78 @@ export function PhotoUpload({
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Bersihkan object URL ketika preview diganti atau komponen dilepas.
+  useEffect(() => {
+    if (!preview?.startsWith('blob:')) return
+
+    const currentPreview = preview
+
+    return () => {
+      URL.revokeObjectURL(currentPreview)
+    }
+  }, [preview])
+
   const handleFile = async (file: File | undefined) => {
     if (!file) return
+
     const invalid = validatePhoto(file)
+
     if (invalid) {
       toast.error(invalid)
+      if (inputRef.current) inputRef.current.value = ''
       return
     }
+
     setUploading(true)
+
     try {
-      const uploadedPath = await uploadReturnPhoto(file, kind)
-      onChange(uploadedPath, URL.createObjectURL(file))
-      toast.success(`${label} berhasil diupload`)
-    } catch (e) {
-      toast.error((e as Error).message)
+      // Kompres satu kali, lalu gunakan hasil yang sama untuk upload dan preview.
+      const compressedFile = await compressReturnPhoto(file)
+      const uploadedPath = await uploadReturnPhoto(
+        compressedFile,
+        kind,
+        true,
+      )
+      const compressedPreview = URL.createObjectURL(compressedFile)
+
+      onChange(uploadedPath, compressedPreview)
+      toast.success(`${label} berhasil dikompres dan diupload`)
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Gagal mengupload ${label.toLowerCase()}`,
+      )
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     }
   }
+
   const handleRemove = async () => {
-  if (!path || uploading || deleting) return
+    if (!path || uploading || deleting) return
 
-  setDeleting(true)
+    setDeleting(true)
 
-  try {
-    await deleteReturnPhoto(path)
-
-    if (preview?.startsWith('blob:')) {
-      URL.revokeObjectURL(preview)
+    try {
+      await deleteReturnPhoto(path)
+      onChange(null, null)
+      toast.success(`${label} berhasil dihapus`)
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Gagal menghapus ${label.toLowerCase()}`,
+      )
+    } finally {
+      setDeleting(false)
     }
-
-    onChange(null, null)
-    toast.success(`${label} berhasil dihapus`)
-  } catch (error) {
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : `Gagal menghapus ${label.toLowerCase()}`,
-    )
-  } finally {
-    setDeleting(false)
   }
-}
 
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
+
       <input
         ref={inputRef}
         id={id}
@@ -84,26 +112,32 @@ export function PhotoUpload({
         accept="image/jpeg,image/png,image/webp"
         capture="environment"
         className="sr-only"
-        onChange={(e) => handleFile(e.target.files?.[0])}
+        onChange={(event) => handleFile(event.target.files?.[0])}
         disabled={uploading}
       />
+
       {path && preview ? (
         <div className="relative overflow-hidden rounded-md border bg-muted">
-          <img src={preview} alt={`Preview ${label}`} className="aspect-video w-full object-cover" />
+          <img
+            src={preview}
+            alt={`Preview ${label}`}
+            className="aspect-video w-full object-cover"
+          />
+
           <Button
             type="button"
             size="icon-sm"
             variant="secondary"
-            className="absolute top-2 right-2"
+            className="absolute right-2 top-2"
             aria-label={`Hapus ${label}`}
-           onClick={handleRemove}
-disabled={uploading || deleting}
+            onClick={handleRemove}
+            disabled={uploading || deleting}
           >
             {deleting ? (
-  <Loader2 className="size-4 animate-spin" />
-) : (
-  <X />
-)}
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <X />
+            )}
           </Button>
         </div>
       ) : (
@@ -113,9 +147,19 @@ disabled={uploading || deleting}
           disabled={uploading}
           className="flex aspect-video w-full flex-col items-center justify-center gap-1.5 rounded-md border border-dashed bg-muted/40 text-sm text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"
         >
-          {uploading ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
-          <span>{uploading ? 'Mengupload...' : 'Pilih / ambil foto'}</span>
-          <span className="text-xs">JPG, PNG, WEBP maks 5 MB</span>
+          {uploading ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <ImagePlus className="size-5" />
+          )}
+
+          <span>
+            {uploading ? 'Mengompres dan mengupload...' : 'Pilih / ambil foto'}
+          </span>
+
+          <span className="text-xs">
+            JPG, PNG, WEBP maks 5 MB • kompres otomatis
+          </span>
         </button>
       )}
     </div>
