@@ -147,10 +147,7 @@ export default async function DashboardPage({
 
   if (!isSupabaseConfigured) {
     return (
-      <main
-        id="dashboard-screenshot"
-        className="min-h-full space-y-6 bg-background pb-8"
-      >
+      <main className="min-h-full space-y-6 bg-background pb-8">
         <DashboardHeader canCreate={canCreate} />
         <SetupNotice />
       </main>
@@ -170,7 +167,6 @@ export default async function DashboardPage({
 
     return (
       <main
-        id="dashboard-screenshot"
         className="mx-auto min-h-full w-full max-w-[1600px] space-y-6 bg-background pb-8"
       >
         <DashboardHeader canCreate={canCreate} />
@@ -194,57 +190,63 @@ export default async function DashboardPage({
           </div>
         </section>
 
-        {/* RINGKASAN */}
-        <section aria-labelledby="summary-heading" className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2
-                id="summary-heading"
-                className="text-lg font-bold tracking-tight text-foreground"
-              >
-                Ringkasan Return
-              </h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Indikator penerimaan berdasarkan filter aktif.
-              </p>
+        {/* AREA REPORT: hanya Ringkasan Return dan Analisis Return */}
+        <div
+          id="dashboard-report"
+          className="w-full space-y-6 rounded-xl border border-border/70 bg-background p-3 text-foreground shadow-sm sm:p-5"
+        >
+          {/* RINGKASAN */}
+          <section aria-labelledby="summary-heading" className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2
+                  id="summary-heading"
+                  className="text-lg font-bold tracking-tight text-foreground"
+                >
+                  Ringkasan Return
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Indikator penerimaan berdasarkan filter aktif.
+                </p>
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                Data Supabase
+              </span>
             </div>
-            <span className="text-[11px] text-muted-foreground">
-              Data Supabase
-            </span>
-          </div>
 
-          <StatCards data={dashboardData} />
-        </section>
+            <StatCards data={dashboardData} />
+          </section>
 
-        {/* ANALYTICS */}
-        <section aria-labelledby="analytics-heading" className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2
-                id="analytics-heading"
-                className="text-lg font-bold tracking-tight text-foreground"
-              >
-                Analisis Return
-              </h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Tren penerimaan, Qty Aktual, dan distribusi Return per customer.
-              </p>
+          {/* ANALYTICS */}
+          <section aria-labelledby="analytics-heading" className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2
+                  id="analytics-heading"
+                  className="text-lg font-bold tracking-tight text-foreground"
+                >
+                  Analisis Return
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Tren penerimaan, Qty Aktual, dan distribusi Return per customer.
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                Data langsung
+              </span>
             </div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
-              Data langsung
-            </span>
-          </div>
 
-          <ReturnChart
-            data={dashboardData.chart}
-            mode={dashboardData.chartMode}
-            customerQtyData={dashboardData.customerQtyChart}
-            customerData={dashboardData.customerChart}
+            <ReturnChart
+              data={dashboardData.chart}
+              mode={dashboardData.chartMode}
+              customerQtyData={dashboardData.customerQtyChart}
+              customerData={dashboardData.customerChart}
               adminProgressData={dashboardData.adminProgressChart}
               disposisiData={dashboardData.disposisiChart}
-          />
-        </section>
+            />
+          </section>
+        </div>
 
         {/* RETURN HARI INI - tidak mengikuti filter grafik/dashboard. */}
         <section
@@ -305,10 +307,7 @@ export default async function DashboardPage({
     console.error('[Dashboard Return]', error)
 
     return (
-      <main
-        id="dashboard-screenshot"
-        className="min-h-full space-y-6 bg-background pb-8"
-      >
+      <main className="min-h-full space-y-6 bg-background pb-8">
         <DashboardHeader canCreate={canCreate} />
         <ErrorState message={getSafeErrorMessage(error)} />
       </main>

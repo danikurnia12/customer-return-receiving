@@ -32,7 +32,15 @@ const FIELD_LABELS: Record<string, string> = {
   no_return: 'No Return',
   tanggal_penerimaan: 'Tanggal Penerimaan',
   no_sppb: 'No Surat Jalan',
-  no_claim: 'No Claim',
+
+  no_claim: 'No Claim 1',
+  no_claim_2: 'No Claim 2',
+  no_claim_3: 'No Claim 3',
+  no_claim_4: 'No Claim 4',
+
+  no_ncr: 'No NCR 1',
+  no_ncr_2: 'No NCR 2',
+
   customer: 'Customer',
   pic_penerima: 'PIC Penerima',
   catatan: 'Catatan',
@@ -47,8 +55,8 @@ const FIELD_LABELS: Record<string, string> = {
   qty_surat_jalan: 'Qty Surat Jalan',
   kondisi_material: 'Kondisi Material',
   location: 'Lokasi',
-  no_ncr: 'No NCR',
   disposisi: 'Disposisi',
+  item_id: 'ID Item',
   pic: 'PIC',
   tindakan: 'Tindakan',
   target: 'Target',
@@ -378,7 +386,7 @@ function HistoryActivityCard({
 
       {/* Activity content */}
 
-      <article className="mb-5 min-w-0 flex-1 overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm transition-shadow hover:shadow-md">
+      <article className="mb-5 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
         {/* Activity heading */}
 
         <div className="flex flex-col gap-3 border-b bg-muted/15 p-4 sm:flex-row sm:items-start sm:justify-between">

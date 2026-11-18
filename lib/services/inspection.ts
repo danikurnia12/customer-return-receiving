@@ -4,13 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 export type InspectionMonitoringLine = {
   id: number
   return_header_id: number
-  diameter: number | null
+  diameter: string | null
   tebal: number | null
   panjang: number | null
   qty_aktual: number
   batch: string | null
   no_box: string | null
   location: string | null
+  disposisi: string | null
 }
 
 export type InspectionMonitoringItem = {
@@ -23,7 +24,7 @@ export type InspectionMonitoringItem = {
   no_claim_3: string | null
   no_claim_4: string | null
   no_ncr: string | null
-  disposisi: string | null
+  no_ncr_2: string | null
   status: string | null
   created_at: string
   updated_at: string | null
@@ -32,8 +33,8 @@ export type InspectionMonitoringItem = {
 
 /**
  * Monitoring per transaksi Return.
- * Ukuran material diambil dari return_items dan dikelompokkan
- * berdasarkan return_header_id.
+ * Nomor Claim dan NCR diambil dari return_headers.
+ * Disposisi diambil dari masing-masing return_items.
  */
 export async function listInspectionMonitoring(): Promise<
   InspectionMonitoringItem[]
@@ -52,7 +53,7 @@ export async function listInspectionMonitoring(): Promise<
       no_claim_3,
       no_claim_4,
       no_ncr,
-      disposisi,
+      no_ncr_2,
       status,
       created_at,
       updated_at
@@ -88,24 +89,25 @@ export async function listInspectionMonitoring(): Promise<
       qty_aktual,
       batch,
       no_box,
-      location
+      location,
+      disposisi
     `)
     .in('return_header_id', returnIds)
     .order('id', { ascending: true })
 
   if (itemError) {
     console.error('[listInspectionMonitoring] items:', itemError)
-    throw new Error('Gagal mengambil ukuran item Return.')
+    throw new Error('Gagal mengambil ukuran dan Disposisi item Return.')
   }
 
   const itemRows = (itemData ?? []) as unknown as InspectionMonitoringLine[]
 
   const itemsByReturn = new Map<number, InspectionMonitoringLine[]>()
 
-  for (const item of itemRows) {
-    const existing = itemsByReturn.get(item.return_header_id) ?? []
-    existing.push(item)
-    itemsByReturn.set(item.return_header_id, existing)
+  for (const material of itemRows) {
+    const existing = itemsByReturn.get(material.return_header_id) ?? []
+    existing.push(material)
+    itemsByReturn.set(material.return_header_id, existing)
   }
 
   return headers.map((header) => ({
@@ -126,7 +128,7 @@ export type InspectionQueueItem = {
   no_sppb: string | null
   no_claim: string | null
   customer: string | null
-  diameter: number | null
+  diameter: string | null
   tebal: number | null
   panjang: number | null
   batch: string | null

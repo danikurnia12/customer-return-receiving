@@ -6,6 +6,7 @@ import { Fragment, useState } from 'react'
 import {
   Camera,
   CheckCircle2,
+  Download,
   ChevronDown,
   LogOut,
   Moon,
@@ -86,7 +87,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
 
   const screenshotTargetId = isAIPage
     ? 'ai-screenshot'
-    : 'dashboard-screenshot'
+    : 'dashboard-report'
 
   async function handleScreenshot() {
     const element = document.getElementById(screenshotTargetId)
@@ -95,7 +96,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
       alert(
         isAIPage
           ? 'Area laporan AI tidak ditemukan. Pastikan halaman AI memiliki id "ai-screenshot".'
-          : 'Area dashboard tidak ditemukan. Pastikan dashboard memiliki id "dashboard-screenshot".',
+          : 'Area report Dashboard tidak ditemukan. Pastikan halaman Dashboard memiliki id "dashboard-report".',
       )
       return
     }
@@ -103,13 +104,23 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
     try {
       setScreenshotLoading(true)
 
-      // Beri jeda agar state loading sempat dirender.
+      // Tunggu status tombol, font, dan layout grafik siap sebelum membuat PNG.
       await new Promise((resolve) => setTimeout(resolve, 150))
+      if ('fonts' in document) {
+        await document.fonts.ready
+      }
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      )
 
+      const reportBackground = window.getComputedStyle(element).backgroundColor
       const dataUrl = await toPng(element, {
         cacheBust: true,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
+        pixelRatio: 3,
+        backgroundColor:
+          reportBackground && reportBackground !== 'rgba(0, 0, 0, 0)'
+            ? reportBackground
+            : '#ffffff',
         skipFonts: false,
         filter: (node) =>
           !(
@@ -124,7 +135,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
 
       link.download = isAIPage
         ? `report-monitoring-ai-${today}.png`
-        : `dashboard-return-${today}.png`
+        : `report-return-${today}.png`
 
       link.href = dataUrl
       link.click()
@@ -134,7 +145,7 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
       alert(
         isAIPage
           ? 'Screenshot laporan AI gagal dibuat. Silakan coba kembali.'
-          : 'Screenshot dashboard gagal dibuat. Silakan coba kembali.',
+          : 'Download report Dashboard gagal dibuat. Silakan coba kembali.',
       )
     } finally {
       setScreenshotLoading(false)
@@ -238,12 +249,12 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
             aria-label={
               isAIPage
                 ? 'Screenshot laporan monitoring AI'
-                : 'Screenshot dashboard'
+                : 'Download report Ringkasan dan Analisis Return'
             }
             title={
               isAIPage
                 ? 'Screenshot laporan monitoring AI'
-                : 'Screenshot dashboard'
+                : 'Download report Ringkasan dan Analisis Return'
             }
             onClick={handleScreenshot}
             disabled={screenshotLoading}
@@ -274,25 +285,47 @@ export function AppTopbar({ user }: { user: AppUser | null }) {
                   "
                 />
 
-                <Camera
-                  className="
-                    relative
-                    size-4
-                    animate-pulse
-                    text-primary
-                  "
-                />
+                {isDashboard ? (
+                  <Download
+                    className="
+                      relative
+                      size-4
+                      animate-pulse
+                      text-primary
+                    "
+                  />
+                ) : (
+                  <Camera
+                    className="
+                      relative
+                      size-4
+                      animate-pulse
+                      text-primary
+                    "
+                  />
+                )}
               </>
             ) : (
               <>
-                <Camera
-                  className="
-                    size-4
-                    transition-transform
-                    duration-200
-                    group-hover:scale-110
-                  "
-                />
+                {isDashboard ? (
+                  <Download
+                    className="
+                      size-4
+                      transition-transform
+                      duration-200
+                      group-hover:scale-110
+                    "
+                  />
+                ) : (
+                  <Camera
+                    className="
+                      size-4
+                      transition-transform
+                      duration-200
+                      group-hover:scale-110
+                    "
+                  />
+                )}
 
                 <span
                   className="

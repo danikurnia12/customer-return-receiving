@@ -1,3 +1,4 @@
+
 'use client'
 
 import { memo, useMemo } from 'react'
@@ -74,7 +75,7 @@ const adminProgressConfig = {
 
 const disposisiConfig = {
   count: {
-    label: 'Jumlah Return',
+    label: 'Jumlah Item',
     color: 'var(--chart-5)',
   },
 } satisfies ChartConfig
@@ -542,9 +543,11 @@ export const ReturnChart = memo(function ReturnChart({
                 </CardTitle>
 
                 <CardDescription className="mt-1">
-                  Persentase pada label menunjukkan jumlah transaksi
-                  yang sudah terisi. No Claim dihitung terisi jika
-                  minimal satu dari empat kolom digunakan.
+                  No Claim dan No NCR dihitung berdasarkan jumlah transaksi.
+                  Disposisi dihitung berdasarkan jumlah item material.
+                  No Claim dianggap terisi jika minimal satu dari empat
+                  kolom digunakan, sedangkan No NCR jika minimal satu
+                  dari dua kolom digunakan.
                 </CardDescription>
               </div>
             </div>
@@ -691,9 +694,9 @@ export const ReturnChart = memo(function ReturnChart({
                 </CardTitle>
 
                 <CardDescription className="mt-1">
-                  Jumlah transaksi berdasarkan keputusan disposisi.
-                  Transaksi yang belum memiliki pilihan masuk ke
-                  kategori Belum ditentukan.
+                  Jumlah item material berdasarkan keputusan disposisi.
+                  Item yang belum memiliki pilihan masuk ke kategori
+                  Belum ditentukan.
                 </CardDescription>
               </div>
             </div>
@@ -701,7 +704,7 @@ export const ReturnChart = memo(function ReturnChart({
 
           <CardContent className="px-2 pb-4 sm:px-4 sm:pb-5">
             {!hasDisposisiData ? (
-              <ChartEmptyState description="Belum ada data disposisi pada transaksi aktif di filter Dashboard ini." />
+              <ChartEmptyState description="Belum ada data Disposisi item pada transaksi aktif di filter Dashboard ini." />
             ) : (
               <ChartContainer
                 config={disposisiConfig}

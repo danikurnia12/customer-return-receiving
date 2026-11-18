@@ -1,3 +1,4 @@
+
 import { createClient } from '@/lib/supabase/server'
 import { PHOTO_BUCKET } from '@/lib/supabase/config'
 import { monthStartISO, todayISO } from '@/lib/format'
@@ -22,6 +23,9 @@ const DISPOSISI_OPTIONS = [
   'Sortir/Repair',
   'Hold',
   'Prime',
+  'Cutting ulang',
+  'Champer ulang',
+  'Dialihkan ke customer lain',
 ] as const
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -518,7 +522,7 @@ export interface DashboardData {
     count: number
   }[]
 
-  /** Kelengkapan No Claim, No NCR, dan Disposisi. */
+  /** No Claim dan No NCR dihitung per transaksi; Disposisi dihitung per item. */
   adminProgressChart: {
     name: string
     label: string
@@ -527,7 +531,7 @@ export interface DashboardData {
     filledPercent: number
   }[]
 
-  /** Jumlah transaksi berdasarkan kategori Disposisi. */
+  /** Jumlah item material berdasarkan kategori Disposisi. */
   disposisiChart: {
     name: string
     count: number
@@ -580,12 +584,12 @@ export async function getDashboardData(
   /* ==========================================================
      DATA ADMINISTRASI UNTUK GRAFIK 4 DAN 5
 
-     Gunakan ID dari transaksi aktif yang sudah melewati filter
-     Dashboard. Dengan demikian filter tanggal, customer, status,
-     dan pencarian tetap konsisten.
+     No Claim dan No NCR dihitung berdasarkan transaksi Header.
+     Disposisi dihitung berdasarkan setiap Item Material.
 
-     Query hanya mengambil kolom administrasi yang diperlukan.
-     Tidak mengambil seluruh data Header maupun detail Item.
+     Semua data tetap menggunakan ID transaksi aktif yang telah
+     melewati filter Dashboard agar filter tanggal, customer,
+     status, dan pencarian tetap konsisten.
      ========================================================== */
 
   type AdminHeaderRow = {
@@ -595,10 +599,17 @@ export async function getDashboardData(
     no_claim_3: string | null
     no_claim_4: string | null
     no_ncr: string | null
+    no_ncr_2: string | null
+  }
+
+  type AdminDisposisiItemRow = {
+    id: number
+    return_header_id: number
     disposisi: string | null
   }
 
   const adminRows: AdminHeaderRow[] = []
+  const adminItemRows: AdminDisposisiItemRow[] = []
 
   for (
     let index = 0;
@@ -608,42 +619,73 @@ export async function getDashboardData(
     const headerIds = active
       .slice(index, index + HEADER_ID_GROUP_SIZE)
       .map((header) => Number(header.id))
-      .filter((id) => Number.isSafeInteger(id))
+      .filter((id) => Number.isSafeInteger(id) && id > 0)
 
     if (headerIds.length === 0) {
       continue
     }
 
-    const { data, error } = await supabase
+    /* Ambil nomor Claim dan NCR dari Header. */
+
+    const { data: headerData, error: headerError } = await supabase
       .from('return_headers')
       .select(
-        'id, no_claim, no_claim_2, no_claim_3, no_claim_4, no_ncr, disposisi',
+        'id, no_claim, no_claim_2, no_claim_3, no_claim_4, no_ncr, no_ncr_2',
       )
       .in('id', headerIds)
 
-    if (error) {
+    if (headerError) {
       throw new Error(
-        `Gagal mengambil data progres administrasi Dashboard: ${error.message}`,
+        `Gagal mengambil data progres administrasi Dashboard: ${headerError.message}`,
       )
     }
 
-    adminRows.push(...((data ?? []) as AdminHeaderRow[]))
+    adminRows.push(
+      ...((headerData ?? []) as AdminHeaderRow[]),
+    )
+
+    /* Ambil Disposisi dari setiap Item dalam kelompok Header. */
+
+    let itemOffset = 0
+
+    while (true) {
+      const { data: itemData, error: itemError } = await supabase
+        .from('return_items')
+        .select('id, return_header_id, disposisi')
+        .in('return_header_id', headerIds)
+        .order('id', { ascending: true })
+        .range(
+          itemOffset,
+          itemOffset + ITEM_PAGE_SIZE - 1,
+        )
+
+      if (itemError) {
+        throw new Error(
+          `Gagal mengambil Disposisi Item Dashboard: ${itemError.message}`,
+        )
+      }
+
+      const itemBatch = (itemData ?? []) as AdminDisposisiItemRow[]
+
+      adminItemRows.push(...itemBatch)
+
+      if (itemBatch.length < ITEM_PAGE_SIZE) {
+        break
+      }
+
+      itemOffset += itemBatch.length
+    }
   }
 
   const hasValue = (value: string | null | undefined) =>
     Boolean(value?.trim())
 
+  /* ==========================================================
+     KELENGKAPAN NO CLAIM DAN NO NCR PER TRANSAKSI
+     ========================================================== */
+
   let claimFilled = 0
   let ncrFilled = 0
-  let disposisiFilled = 0
-
-  const disposisiBuckets = new Map<string, number>()
-
-  for (const option of DISPOSISI_OPTIONS) {
-    disposisiBuckets.set(option, 0)
-  }
-
-  disposisiBuckets.set('Belum ditentukan', 0)
 
   for (const row of adminRows) {
     const hasClaim = [
@@ -657,11 +699,34 @@ export async function getDashboardData(
       claimFilled += 1
     }
 
-    if (hasValue(row.no_ncr)) {
+    const hasNcr = [
+      row.no_ncr,
+      row.no_ncr_2,
+    ].some(hasValue)
+
+    if (hasNcr) {
       ncrFilled += 1
     }
+  }
 
-    const disposisi = row.disposisi?.trim() || 'Belum ditentukan'
+  /* ==========================================================
+     SEBARAN DISPOSISI PER ITEM
+     ========================================================== */
+
+  let disposisiFilled = 0
+
+  const disposisiItemTotal = adminItemRows.length
+  const disposisiBuckets = new Map<string, number>()
+
+  for (const option of DISPOSISI_OPTIONS) {
+    disposisiBuckets.set(option, 0)
+  }
+
+  disposisiBuckets.set('Belum ditentukan', 0)
+
+  for (const item of adminItemRows) {
+    const disposisi =
+      item.disposisi?.trim() || 'Belum ditentukan'
 
     if (disposisi !== 'Belum ditentukan') {
       disposisiFilled += 1
@@ -673,44 +738,57 @@ export async function getDashboardData(
     )
   }
 
-  const adminTotal = active.length
+  /* ==========================================================
+     KELENGKAPAN ADMINISTRASI
 
-  const getFilledPercent = (filled: number) =>
-    adminTotal > 0
-      ? Math.round((filled / adminTotal) * 100)
+     No Claim dan No NCR menggunakan total transaksi.
+     Disposisi menggunakan total item material.
+     ========================================================== */
+
+  const adminTotal = adminRows.length
+
+  const getFilledPercent = (
+    filled: number,
+    total: number,
+  ) =>
+    total > 0
+      ? Math.round((filled / total) * 100)
       : 0
 
   const adminProgressChart = [
     {
       name: 'No Claim',
-      label: `No Claim (${getFilledPercent(claimFilled)}%)`,
+      label: `No Claim (${getFilledPercent(claimFilled, adminTotal)}%)`,
       filled: claimFilled,
       missing: Math.max(adminTotal - claimFilled, 0),
-      filledPercent: getFilledPercent(claimFilled),
+      filledPercent: getFilledPercent(claimFilled, adminTotal),
     },
     {
       name: 'No NCR',
-      label: `No NCR (${getFilledPercent(ncrFilled)}%)`,
+      label: `No NCR (${getFilledPercent(ncrFilled, adminTotal)}%)`,
       filled: ncrFilled,
       missing: Math.max(adminTotal - ncrFilled, 0),
-      filledPercent: getFilledPercent(ncrFilled),
+      filledPercent: getFilledPercent(ncrFilled, adminTotal),
     },
     {
       name: 'Disposisi',
-      label: `Disposisi (${getFilledPercent(disposisiFilled)}%)`,
+      label: `Disposisi (${getFilledPercent(disposisiFilled, disposisiItemTotal)}%)`,
       filled: disposisiFilled,
-      missing: Math.max(adminTotal - disposisiFilled, 0),
-      filledPercent: getFilledPercent(disposisiFilled),
+      missing: Math.max(disposisiItemTotal - disposisiFilled, 0),
+      filledPercent: getFilledPercent(
+        disposisiFilled,
+        disposisiItemTotal,
+      ),
     },
   ]
 
   /*
    * Pertahankan urutan pilihan Disposisi dari form.
    * Nilai lama/di luar daftar pilihan tetap ditampilkan agar
-   * tidak ada transaksi yang hilang dari grafik.
+   * tidak ada data Item yang hilang dari grafik.
    */
 
-    const knownDisposisi = new Set<string>([
+  const knownDisposisi = new Set<string>([
     ...DISPOSISI_OPTIONS,
     'Belum ditentukan',
   ])
