@@ -153,12 +153,31 @@ export const returnHeaderSchema = z.object({
    CREATE RETURN
    ============================================================ */
 
-export const createReturnSchema = returnHeaderSchema.extend({
-  items: z
-    .array(returnItemSchema)
-    .min(1, 'Minimal 1 Return Item')
-    .max(200, 'Maksimal 200 item'),
-})
+export const createReturnSchema = returnHeaderSchema
+  .extend({
+    items: z
+      .array(returnItemSchema)
+      .min(1, 'Minimal 1 Return Item')
+      .max(200, 'Maksimal 200 item'),
+  })
+  .superRefine((value, context) => {
+    // Dua dokumentasi Header Return wajib tersedia sebelum transaksi dibuat.
+    if (!value.foto_surat_jalan_url?.trim()) {
+      context.addIssue({
+        code: 'custom',
+        path: ['foto_surat_jalan_url'],
+        message: 'Foto Surat Jalan wajib dilampirkan.',
+      })
+    }
+
+    if (!value.foto_material_url?.trim()) {
+      context.addIssue({
+        code: 'custom',
+        path: ['foto_material_url'],
+        message: 'Foto Aktual Material wajib dilampirkan.',
+      })
+    }
+  })
 
 /* ============================================================
    TYPES

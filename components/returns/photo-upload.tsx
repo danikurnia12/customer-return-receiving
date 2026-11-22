@@ -21,12 +21,16 @@ export function PhotoUpload({
   path,
   preview,
   onChange,
+  required = false,
+  error,
 }: {
   label: string
   kind: PhotoKind
   path: string | null
   preview: string | null
   onChange: (path: string | null, preview: string | null) => void
+  required?: boolean
+  error?: string
 }) {
   const id = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -103,17 +107,25 @@ export function PhotoUpload({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>
+        {label}
+        {required && (
+          <span className="ml-1 text-destructive" aria-hidden="true">
+            *
+          </span>
+        )}
+      </Label>
 
       <input
         ref={inputRef}
         id={id}
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        capture="environment"
         className="sr-only"
         onChange={(event) => handleFile(event.target.files?.[0])}
         disabled={uploading}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
       />
 
       {path && preview ? (
@@ -145,6 +157,7 @@ export function PhotoUpload({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
+          aria-invalid={Boolean(error)}
           className="flex aspect-video w-full flex-col items-center justify-center gap-1.5 rounded-md border border-dashed bg-muted/40 text-sm text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"
         >
           {uploading ? (
@@ -154,13 +167,21 @@ export function PhotoUpload({
           )}
 
           <span>
-            {uploading ? 'Mengompres dan mengupload...' : 'Pilih / ambil foto'}
+            {uploading
+              ? 'Mengompres dan mengupload...'
+              : 'Pilih dari galeri atau kamera'}
           </span>
 
           <span className="text-xs">
             JPG, PNG, WEBP maks 5 MB • kompres otomatis
           </span>
         </button>
+      )}
+
+      {error && (
+        <p id={`${id}-error`} role="alert" className="text-xs font-medium text-destructive">
+          {error}
+        </p>
       )}
     </div>
   )

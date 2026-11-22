@@ -253,6 +253,16 @@ export function ReturnForm({
       ? {}
       : flattenErrors(parsed.error)
 
+    if (!header.foto_surat_jalan_url?.trim()) {
+      nextErrors.foto_surat_jalan_url =
+        'Foto Surat Jalan wajib dilampirkan.'
+    }
+
+    if (!header.foto_material_url?.trim()) {
+      nextErrors.foto_material_url =
+        'Foto Aktual Material wajib dilampirkan.'
+    }
+
     if (items.length === 0) {
       nextErrors.items =
         'Minimal 1 item material harus ditambahkan.'
@@ -633,35 +643,47 @@ export function ReturnForm({
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border bg-background p-3 sm:p-4">
+              <div className={`rounded-xl border bg-background p-3 sm:p-4 ${errors.foto_surat_jalan_url ? 'border-destructive/60' : ''}`}>
                 <PhotoUpload
                   label="Foto Surat Jalan"
                   kind="surat-jalan"
                   path={header.foto_surat_jalan_url}
                   preview={header.foto_surat_jalan_preview}
-                  onChange={(path, preview) =>
+                  required
+                  error={errors.foto_surat_jalan_url}
+                  onChange={(path, preview) => {
                     setHeader((current) => ({
                       ...current,
                       foto_surat_jalan_url: path,
                       foto_surat_jalan_preview: preview,
                     }))
-                  }
+                    setErrors((current) => ({
+                      ...current,
+                      foto_surat_jalan_url: '',
+                    }))
+                  }}
                 />
               </div>
 
-              <div className="rounded-xl border bg-background p-3 sm:p-4">
+              <div className={`rounded-xl border bg-background p-3 sm:p-4 ${errors.foto_material_url ? 'border-destructive/60' : ''}`}>
                 <PhotoUpload
                   label="Foto Aktual Material"
                   kind="material"
                   path={header.foto_material_url}
                   preview={header.foto_material_preview}
-                  onChange={(path, preview) =>
+                  required
+                  error={errors.foto_material_url}
+                  onChange={(path, preview) => {
                     setHeader((current) => ({
                       ...current,
                       foto_material_url: path,
                       foto_material_preview: preview,
                     }))
-                  }
+                    setErrors((current) => ({
+                      ...current,
+                      foto_material_url: '',
+                    }))
+                  }}
                 />
               </div>
             </div>

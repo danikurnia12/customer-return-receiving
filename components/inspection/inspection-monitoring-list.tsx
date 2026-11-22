@@ -597,17 +597,32 @@ function AdminReturnCard({
   const needsSalesFollowUp = !hasClaim
 
   const itemDetails = item.items.length
-    ? item.items.map((material, index) => {
-        const size = `Diameter: ${material.diameter?.trim() || '—'} | Tebal: ${formatNumber(material.tebal)} | Panjang: ${formatNumber(material.panjang)} mm | Qty Aktual: ${formatQuantity(material.qty_aktual)}`
-        return `${index + 1}. ${size}`
-      }).join('\\n')
+    ? item.items
+        .map((material, index) =>
+          [
+            `${index + 1}. *Item Material*`,
+            `   Diameter: ${material.diameter?.trim() || '—'}`,
+            `   Tebal: ${formatNumber(material.tebal)}`,
+            `   Panjang: ${formatNumber(material.panjang)} mm`,
+            `   Qty Aktual: ${formatQuantity(material.qty_aktual)}`,
+          ].join('\n'),
+        )
+        .join('\n\n')
     : 'Belum ada detail item material.'
 
   const qaItemDetails = item.items.length
-    ? item.items.map((material, index) => {
-        const size = `Diameter: ${material.diameter?.trim() || '—'} | Tebal: ${formatNumber(material.tebal)} | Panjang: ${formatNumber(material.panjang)} mm | Qty Aktual: ${formatQuantity(material.qty_aktual)} | Disposisi: ${material.disposisi?.trim() || 'Belum diisi'}`
-        return `${index + 1}. ${size}`
-      }).join('\\n')
+    ? item.items
+        .map((material, index) =>
+          [
+            `${index + 1}. *Item Material*`,
+            `   Diameter: ${material.diameter?.trim() || '—'}`,
+            `   Tebal: ${formatNumber(material.tebal)}`,
+            `   Panjang: ${formatNumber(material.panjang)} mm`,
+            `   Qty Aktual: ${formatQuantity(material.qty_aktual)}`,
+            `   Disposisi: ${material.disposisi?.trim() || 'Belum diisi'}`,
+          ].join('\n'),
+        )
+        .join('\n\n')
     : 'Belum ada detail item material.'
 
   const missingQaRequests = [
@@ -620,13 +635,46 @@ function AdminReturnCard({
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  function buildSalesMessage() {
-    return `Halo Bapak/Ibu Sales, mohon bantu follow up No Claim untuk Return Customer berikut:\\n\\n*No Return:* ${item.no_return}\\n*Customer:* ${item.customer || '—'}\\n*Tanggal Penerimaan:* ${formatDate(item.tanggal_penerimaan)}\\n\\n*Detail Item Retur:*\\n${itemDetails}\\n\\nMohon bantu proses dan update No Claim agar administrasi Return dapat dilanjutkan.\\n\\nMohon balas pesan ini apabila No Claim sudah tersedia agar secara realtime kami tindaklanjuti dan update pada aplikasi.\\n\\nTerima kasih 🙏`
-  }
 
-  function buildQaMessage() {
-    return `Halo Bapak/Ibu QA, mohon bantu follow up ${missingQaRequests} untuk Return Customer berikut:\\n\\n*No Return:* ${item.no_return}\\n*Customer:* ${item.customer || '—'}\\n*Tanggal Penerimaan:* ${formatDate(item.tanggal_penerimaan)}\\n\\n*Detail Item Retur:*\\n${qaItemDetails}\\n\\nMohon bantu proses dan update ${missingQaRequests} agar administrasi Return dapat dilanjutkan.\\n\\nMohon balas pesan ini apabila No NCR dan/atau Disposisi sudah diperbarui agar secara realtime kami tindaklanjuti dan update pada aplikasi.\\n\\nTerima kasih 🙏`
-  }
+function buildSalesMessage() {
+  return [
+    'Halo Bapak/Ibu Sales,',
+    '',
+    'Mohon bantuan untuk menginformasikan *No. Claim* yang telah diterbitkan untuk Return Customer berikut:',
+    '',
+    `*No Return:* ${item.no_return}`,
+    `*Customer:* ${item.customer || '—'}`,
+    `*Tanggal Penerimaan:* ${formatDate(item.tanggal_penerimaan)}`,
+    '',
+    '*Detail Item Retur:*',
+    itemDetails,
+    '',
+    'Mohon informasikan No. Claim melalui balasan pesan ini agar dapat segera kami catat pada aplikasi dan proses administrasi Return dapat dilanjutkan secara real time.',
+    '',
+    'Terima kasih.',
+  ].join('\n')
+}
+
+
+function buildQaMessage() {
+  return [
+    'Halo Bapak/Ibu QA,',
+    '',
+    `Mohon bantuan untuk menginformasikan *${missingQaRequests}* yang telah diterbitkan atau ditetapkan untuk Return Customer berikut:`,
+    '',
+    `*No Return:* ${item.no_return}`,
+    `*Customer:* ${item.customer || '—'}`,
+    `*Tanggal Penerimaan:* ${formatDate(item.tanggal_penerimaan)}`,
+    '',
+    '*Detail Item Retur:*',
+    qaItemDetails,
+    '',
+    'Mohon informasikan No. NCR dan/atau hasil Disposisi melalui balasan pesan ini agar dapat segera kami catat pada aplikasi dan proses Return dapat ditindaklanjuti secara real time.',
+    '',
+    'Terima kasih.',
+  ].join('\n')
+}
+
 
   return (
     <article className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
